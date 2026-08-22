@@ -1,48 +1,64 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const cors = require('cors');
 
 const app = express();
-app.use(cors());
-
 const server = http.createServer(app);
+
+// Enable CORS so your GitHub Pages frontend can talk to Render
 const io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: "*", // Allows connections from any frontend URL (like your GitHub Pages)
         methods: ["GET", "POST"]
     }
 });
 
+app.get('/', (req, res) => {
+    res.send('Gem Merchant Multiplayer Server is Running!');
+});
+
+// Track rooms and players
 const rooms = {};
 
 io.on('connection', (socket) => {
-    console.log(`A player connected: ${socket.id}`);
+    console.log(`A user connected: ${socket.id}`);
 
-    socket.on('join_room', ({ roomCode, playerName }) => {
+    // Listen for players joining a specific room code
+    socket.on('join-room', ({ roomCode, playerName }) => {
         socket.join(roomCode);
+        console.log(`${playerName} (${socket.id}) joined room: ${roomCode}`);
+
         if (!rooms[roomCode]) {
             rooms[roomCode] = { players: [] };
         }
-        
+
+        // Add player to room list
         rooms[roomCode].players.push({ id: socket.id, name: playerName });
-        io.to(roomCode).emit('update_room', rooms[roomCode]);
-        console.log(`${playerName} joined room: ${roomCode}`);
+
+        // Tell everyone in the room that a new player joined
+        io.to(roomCode).emit('player-joined', rooms[roomCode]);
+        
+        // Send updated game state to the room
+        io.to(roomCode).emit('update-game-state', {
+            room: roomCode,
+            players: rooms[roomCode].players,
+            turn: rooms[roomCode].players[0]?.name || 'Waiting...'
+        });
     });
 
-    socket.on('game_action', ({ roomCode, actionData }) => {
-        socket.to(roomCode).emit('sync_game_state', actionData);
+    // Handle game actions (like picking tokens or buying cards)
+    socket.on('player-action', (data) => {
+        // Broadcast the action to everyone else in the same room
+        socket.to(data.roomCode).emit('update-game-state', data.newState);
     });
 
     socket.on('disconnect', () => {
-        console.log(`Player disconnected: ${socket.id}`);
-        for (const roomCode in rooms) {
-            rooms[roomCode].players = rooms[roomCode].players.filter(p => p.id !== socket.id);
-            io.to(roomCode).emit('update_room', rooms[roomCode]);
-        }
+        console.log(`User disconnected: ${socket.id}`);
+        // Optional: clean up rooms if players leave
     });
 });
 
-server.listen(3000, () => {
-    console.log('Multiplayer server is running on port 3000');
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}`);
 });
