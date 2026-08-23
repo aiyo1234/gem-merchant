@@ -136,7 +136,7 @@ export class UIRenderer {
                 </div>
 
                 <div style="display: flex; flex-direction: column; justify-content: center; color: var(--text-gold); flex-grow: 1;">
-                    <h3 style="font-family: 'Cinzel', serif; color: var(--gold); margin-top: 0; margin-bottom: 12px; font-size: 1.3em; border-bottom: 1px solid #5a4b31; padding-bottom: 6px;">${isPatron ? 'Patron Visit' : 'Cuisine Card'}</h3>
+                    <h3 style="font-family: 'Cinzel', serif; color: var(--gold); margin-top: 0; margin-bottom: 8px; font-size: 1.3em; border-bottom: 1px solid #5a4b31; padding-bottom: 6px;">${cardData.name || (isPatron ? 'Noble Food Patron' : 'Malaysian Cuisine')}</h3>
                     <div style="margin-bottom: 15px;">
                         <b style="color: var(--gold-light); font-size: 0.85em; text-transform: uppercase;">${isPatron ? 'Bonus Requirements' : 'Token Cost'}:</b>
                         <div style="margin-top: 8px; max-height: 140px; overflow-y: auto;">${costHTML || 'None'}</div>
@@ -344,6 +344,7 @@ export class UIRenderer {
                     <div class="splendor-cost-container">
                         ${costBadgesHTML}
                     </div>
+                    <div class="card-dish-name-badge" title="${card.name}">${card.name}</div>
                     <div class="btn-group">
                         <button class="buy-btn" data-tier="${tier}" data-id="${card.id}">BUY</button>
                         <button class="res-btn" data-tier="${tier}" data-id="${card.id}">HOLD</button>

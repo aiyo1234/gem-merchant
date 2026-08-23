@@ -319,6 +319,21 @@ h1, h2, h3, h4, .cinzel-font {
     50% { transform: translateY(-2px); }
 }
 
+.card-dish-name-badge {
+    background: rgba(4, 13, 22, 0.85);
+    color: var(--text-gold);
+    font-size: 0.58em;
+    font-weight: 600;
+    padding: 2px 4px;
+    border-radius: 3px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    margin-bottom: 2px;
+}
+
 .btn-group {
     display: flex;
     gap: 4px;

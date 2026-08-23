@@ -145,6 +145,17 @@
             </div>
 
             <div class="nav-right">
+                <div style="position: relative; display: inline-block;">
+                    <button id="emotes-toggle-btn" class="nav-btn" title="Send reaction to players">💬 Reactions</button>
+                    <div id="emotes-dropdown" style="display: none; position: absolute; top: 35px; right: 0; background: #0b1c2c; border: 1px solid var(--panel-border); border-radius: 8px; padding: 8px; gap: 6px; z-index: 2000; box-shadow: 0 8px 20px rgba(0,0,0,0.8); grid-template-columns: repeat(3, 1fr); min-width: 250px;">
+                        <button class="emote-btn nav-btn" data-emote="😋 Sedap!">😋 Sedap!</button>
+                        <button class="emote-btn nav-btn" data-emote="🔥 Nice Move!">🔥 Nice!</button>
+                        <button class="emote-btn nav-btn" data-emote="⏳ Hurry Up!">⏳ Hurry!</button>
+                        <button class="emote-btn nav-btn" data-emote="☕ Teh Tarik!">☕ Teh Tarik</button>
+                        <button class="emote-btn nav-btn" data-emote="👑 Pro Chef!">👑 Pro!</button>
+                        <button class="emote-btn nav-btn" data-emote="😱 GG!">😱 GG!</button>
+                    </div>
+                </div>
                 <button id="music-toggle-btn" class="nav-btn">🔊 Music: OFF</button>
                 <button id="sfx-toggle-btn" class="nav-btn">🔔 SFX: ON</button>
                 <button id="leave-game-btn" class="nav-btn" style="border-color: #e74c3c; color: #e74c3c;">Leave</button>

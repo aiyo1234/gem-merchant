@@ -223,6 +223,8 @@ socket.on('sync_game_state', ({ actionData, fullState }) => {
                 game.purchaseReservedCard(actionData.cardId);
             } else if (actionData.type === 'DISCARD_TOKENS') {
                 game.discardTokens(actionData.tokens);
+            } else if (actionData.type === 'EMOTE') {
+                ui.showToast(`💬 <b>${actionData.senderName}</b>: ${actionData.emote}`);
             }
         }
 
@@ -270,6 +272,37 @@ document.addEventListener('click', (e) => {
         sfxEnabled = !sfxEnabled;
         e.target.textContent = sfxEnabled ? '🔔 SFX: ON' : '🔕 SFX: OFF';
         return;
+    }
+
+    // Emotes Toggle & Selection
+    if (e.target.id === 'emotes-toggle-btn') {
+        const dropdown = document.getElementById('emotes-dropdown');
+        if (dropdown) {
+            dropdown.style.display = dropdown.style.display === 'grid' ? 'none' : 'grid';
+        }
+        return;
+    }
+
+    if (e.target.classList.contains('emote-btn')) {
+        const emote = e.target.dataset.emote;
+        if (emote) {
+            ui.showToast(`💬 <b>${myPlayerName}</b>: ${emote}`);
+            if (currentGameMode === 'online' && currentRoomCode) {
+                socket.emit('game_action', {
+                    roomCode: currentRoomCode,
+                    actionData: { type: 'EMOTE', emote, senderName: myPlayerName }
+                });
+            }
+        }
+        const dropdown = document.getElementById('emotes-dropdown');
+        if (dropdown) dropdown.style.display = 'none';
+        return;
+    }
+
+    // Close emote dropdown if clicked outside
+    const emoteDropdown = document.getElementById('emotes-dropdown');
+    if (emoteDropdown && !e.target.closest('#emotes-dropdown') && e.target.id !== 'emotes-toggle-btn') {
+        emoteDropdown.style.display = 'none';
     }
 
     // Copy Room Code click handlers
