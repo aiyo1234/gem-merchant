@@ -5,8 +5,12 @@ const game = new GameState();
 const ui = new UIRenderer(game);
 window.gameUI = ui;
 
-// Connect to your multiplayer server
-const socket = io('https://gem-merchant.onrender.com'); 
+// ==========================================
+// SOCKET CONNECTION SETUP
+// ==========================================
+// Use 'http://localhost:3000' for local testing, or your Render URL for online play:
+// const socket = io('http://localhost:3000');
+const socket = io('http://localhost:3000');
 
 let selectedTokens = [];
 let chosenPlayerCount = 2; // Default to 2 players
@@ -30,9 +34,18 @@ function playSound(sound, playbackRate = 1.0) {
     }
 }
 
-// Socket Sync Listeners for Multiplayer
+// ==========================================
+// SOCKET SYNC LISTENERS FOR MULTIPLAYER
+// ==========================================
 socket.on('update_room', (roomData) => {
     console.log("Room players updated:", roomData.players);
+    
+    // Update the game status bar to show who is in the room
+    const statusEl = document.getElementById('game-status');
+    if (statusEl) {
+        const namesList = roomData.players.map(p => p.name).join(', ');
+        statusEl.innerText = `Room: ${currentRoomCode} | Connected Players: ${namesList}`;
+    }
 });
 
 socket.on('sync_game_state', (actionData) => {
@@ -46,6 +59,9 @@ socket.on('sync_game_state', (actionData) => {
     ui.renderAll();
 });
 
+// ==========================================
+// EVENT LISTENERS & UI INTERACTION
+// ==========================================
 document.addEventListener('click', (e) => {
     // Music Toggle Button Handler
     if (e.target.id === 'music-toggle-btn') {
@@ -104,7 +120,7 @@ document.addEventListener('click', (e) => {
         return;
     }
 
-    // Online Room Join Handler (Fixed Layout Glitch)
+    // Online Room Join Handler
     if (e.target.id === 'join-online-room-btn') {
         currentRoomCode = prompt("Enter Shared Room Code (e.g. room123):");
         myPlayerName = prompt("Enter Your Chef Name:", "Chef Shiaw");
