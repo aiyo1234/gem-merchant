@@ -742,13 +742,13 @@ h1, h2, h3, h4, .cinzel-font {
    VISUAL GEM DISCARD MODAL
    ========================================== */
 .discard-gem-btn {
-    width: 48px;
-    height: 48px;
+    width: 54px;
+    height: 54px;
     border-radius: 50%;
-    border: 2.5px solid rgba(255, 255, 255, 0.7);
+    border: 3px solid rgba(255, 255, 255, 0.85);
     cursor: pointer;
     position: relative;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.4);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.7), inset 0 3px 6px rgba(255,255,255,0.6);
     transition: transform 0.15s, box-shadow 0.15s;
     display: inline-flex;
     align-items: center;
@@ -757,42 +757,50 @@ h1, h2, h3, h4, .cinzel-font {
     user-select: none;
 }
 
+.discard-gem-btn.ruby, .discard-chip-item.ruby { background: linear-gradient(135deg, #ff4d4d 0%, #b30000 100%) !important; box-shadow: 0 0 12px rgba(231, 76, 60, 0.6); }
+.discard-gem-btn.sapphire, .discard-chip-item.sapphire { background: linear-gradient(135deg, #3498db 0%, #104e8b 100%) !important; box-shadow: 0 0 12px rgba(52, 152, 219, 0.6); }
+.discard-gem-btn.emerald, .discard-chip-item.emerald { background: linear-gradient(135deg, #2ecc71 0%, #145a32 100%) !important; box-shadow: 0 0 12px rgba(46, 204, 113, 0.6); }
+.discard-gem-btn.pearl, .discard-chip-item.pearl { background: linear-gradient(135deg, #ffffff 0%, #bdc3c7 100%) !important; box-shadow: 0 0 12px rgba(255, 255, 255, 0.8); }
+.discard-gem-btn.onyx, .discard-chip-item.onyx { background: linear-gradient(135deg, #566573 0%, #17202a 100%) !important; box-shadow: 0 0 12px rgba(86, 101, 115, 0.6); }
+.discard-gem-btn.gold, .discard-chip-item.gold { background: linear-gradient(135deg, #f1c40f 0%, #b7950b 100%) !important; box-shadow: 0 0 12px rgba(241, 196, 15, 0.7); }
+
 .discard-gem-btn:hover:not(.disabled) {
-    transform: scale(1.15) translateY(-2px);
-    box-shadow: 0 0 14px rgba(231, 76, 60, 0.8);
+    transform: scale(1.18) translateY(-3px);
+    box-shadow: 0 0 18px rgba(255, 255, 255, 0.9);
 }
 
 .discard-gem-btn.disabled {
-    opacity: 0.35;
+    opacity: 0.3;
     cursor: not-allowed;
-    filter: grayscale(60%);
+    filter: grayscale(70%);
 }
 
 .discard-gem-badge {
     position: absolute;
-    top: -5px;
-    right: -5px;
+    top: -6px;
+    right: -6px;
     background: #040d16;
-    color: var(--text-gold);
-    border: 1.5px solid var(--panel-border);
+    color: #fff;
+    border: 2px solid var(--gold);
     border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    font-size: 0.75em;
+    width: 22px;
+    height: 22px;
+    font-size: 0.8em;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 700;
+    font-weight: 900;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.8);
 }
 
 .discard-chip-item {
-    width: 38px;
-    height: 38px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    border: 2px solid #fff;
+    border: 2.5px solid #fff;
     cursor: pointer;
     position: relative;
-    box-shadow: 0 3px 6px rgba(0,0,0,0.5), inset 0 2px 3px rgba(255,255,255,0.4);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.5);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -801,23 +809,24 @@ h1, h2, h3, h4, .cinzel-font {
 }
 
 .discard-chip-item:hover {
-    transform: scale(1.12);
-    box-shadow: 0 0 10px rgba(231, 76, 60, 0.9);
+    transform: scale(1.15);
+    box-shadow: 0 0 14px rgba(231, 76, 60, 0.9);
 }
 
 .discard-chip-item::after {
     content: '✕';
     position: absolute;
-    top: -4px;
-    right: -4px;
+    top: -5px;
+    right: -5px;
     background: #e74c3c;
     color: white;
-    font-size: 10px;
-    width: 14px;
-    height: 14px;
+    font-size: 11px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: bold;
+    border: 1.5px solid white;
 }
