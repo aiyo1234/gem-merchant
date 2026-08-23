@@ -5,18 +5,20 @@ import { MCTSEngine } from './MCTSEngine.js';
 import { MCTS_DNN_WEIGHTS } from './mcts_weights_data.js';
 
 export class GrandmasterAI {
-    // Evolved Champion Genome Weights from 1,000,000+ Self-Play Matches
+    // Evolved Hyper-Rush Champion Genome Weights (Fastest Win = 18 Rounds)
     static DEFAULT_WEIGHTS = {
-        pointMultiplier: 25.82,
-        freeCardBonus: 29.44,
-        oneTokenBonus: 7.63,
-        twoTokenBonus: 18.16,
-        threeTokenBonus: 6.02,
-        tier3Bonus: 33.86,
-        marketDemandMultiplier: 0.68,
-        patronSynergyMultiplier: 7.58,
-        denialUrgency: 50.45,
-        goldReservationThreshold: 2.5
+        pointMultiplier: 77.32,
+        freeCardBonus: 15.0,
+        oneTokenBonus: 6.0,
+        twoTokenBonus: 8.0,
+        threeTokenBonus: 18.43,
+        tier3Bonus: 95.0,
+        tier2Bonus: 45.0,
+        marketDemandMultiplier: 0.2,
+        patronSynergyMultiplier: 31.57,
+        denialUrgency: 35.0,
+        goldReservationThreshold: 1.0,
+        directPointPriority: 100.0
     };
 
     static dnnInstance = null;

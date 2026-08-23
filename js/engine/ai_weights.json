@@ -1,12 +1,14 @@
 {
-  "pointMultiplier": 25.822967356285417,
-  "freeCardBonus": 29.444733149135605,
-  "oneTokenBonus": 7.633220714139757,
-  "twoTokenBonus": 18.16,
-  "threeTokenBonus": 6.02,
-  "tier3Bonus": 33.86,
-  "marketDemandMultiplier": 0.6841796061416126,
-  "patronSynergyMultiplier": 7.58,
-  "denialUrgency": 50.45,
-  "goldReservationThreshold": 2.5
+  "pointMultiplier": 77.31515761378914,
+  "freeCardBonus": 15,
+  "oneTokenBonus": 6,
+  "twoTokenBonus": 8,
+  "threeTokenBonus": 18.429853399256203,
+  "tier3Bonus": 95,
+  "tier2Bonus": 45,
+  "marketDemandMultiplier": 0.2,
+  "patronSynergyMultiplier": 31.574982467908285,
+  "denialUrgency": 35,
+  "goldReservationThreshold": 1,
+  "directPointPriority": 100
 }
