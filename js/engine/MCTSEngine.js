@@ -120,7 +120,18 @@ export class MCTSEngine {
             } catch (e) {}
         });
 
-        // 3. Token taking actions
+        // 3. Strategic high-point reservations with gold
+        if ((player.reservedCards || []).length < 2 && (game.bank.tokens[RESOURCES.GOLD] || 0) > 0) {
+            for (let tier = 2; tier <= 3; tier++) {
+                (game.visibleMarket[tier] || []).forEach(card => {
+                    if (card.points >= 3) {
+                        actions.push({ type: 'RESERVE_CARD', tier, cardId: card.id, card });
+                    }
+                });
+            }
+        }
+
+        // 4. Token taking actions
         const bank = game.bank.tokens;
         const availableGems = Object.entries(bank)
             .filter(([res, count]) => res !== 'gold' && count > 0)
