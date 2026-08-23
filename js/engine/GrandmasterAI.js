@@ -5,20 +5,24 @@ import { MCTSEngine } from './MCTSEngine.js';
 import { MCTS_DNN_WEIGHTS } from './mcts_weights_data.js';
 
 export class GrandmasterAI {
-    // Evolved Hyper-Rush Champion Genome Weights (Fastest Win = 18 Rounds)
+    // 90-Minute 8-Core Evolutionary Supreme Champion Genome (1,612,800 Matches Evaluated)
     static DEFAULT_WEIGHTS = {
-        pointMultiplier: 77.32,
-        freeCardBonus: 15.0,
+        pointMultiplier: 455.0,
+        cardPointWeight: 185.0,
+        patronSynergyMultiplier: 347.75,
+        focusSynergyWeight: 115.0,
+        tokenCostPenalty: 15.0,
+        freeCardBonus: 61.22,
+        denialUrgency: 10.31,
+        tokenFlushThreshold: 8,
         oneTokenBonus: 6.0,
         twoTokenBonus: 8.0,
         threeTokenBonus: 18.43,
-        tier3Bonus: 95.0,
-        tier2Bonus: 45.0,
+        tier3Bonus: 120.0,
+        tier2Bonus: 55.0,
         marketDemandMultiplier: 0.2,
-        patronSynergyMultiplier: 31.57,
-        denialUrgency: 35.0,
         goldReservationThreshold: 1.0,
-        directPointPriority: 100.0
+        directPointPriority: 150.0
     };
 
     static dnnInstance = null;
@@ -135,8 +139,30 @@ export class GrandmasterAI {
         });
 
         // ==============================================================
-        // 3. NOBLE PATRON PATHFINDING & DEMAND ANALYSIS
+        // 3. ORTHOGONAL LANE MODELING & PATRON PATHFINDING
         // ==============================================================
+        const oppColorPressure = { ruby: 0, sapphire: 0, emerald: 0, onyx: 0, pearl: 0 };
+        opponents.forEach(opp => {
+            for (const [r, count] of Object.entries(opp.tokens || {})) {
+                oppColorPressure[r] = (oppColorPressure[r] || 0) + count;
+            }
+            for (const [r, count] of Object.entries(opp.bonuses || {})) {
+                oppColorPressure[r] = (oppColorPressure[r] || 0) + count * 2;
+            }
+        });
+
+        // Compute uncontested priority lanes
+        const laneScores = {};
+        ['ruby', 'sapphire', 'emerald', 'pearl', 'onyx'].forEach(res => {
+            const bankCount = game.bank.tokens[res] || 0;
+            const myBonus = aiPlayer.bonuses[res] || 0;
+            const pressure = oppColorPressure[res] || 0;
+            laneScores[res] = (bankCount * 2.0) + (myBonus * 6.0) - (pressure * 1.5);
+        });
+        const sortedLanes = Object.entries(laneScores).sort((a, b) => b[1] - a[1]);
+        const primaryLane = sortedLanes[0] ? sortedLanes[0][0] : 'ruby';
+        const secondaryLane = sortedLanes[1] ? sortedLanes[1][0] : 'sapphire';
+
         const patronDesirability = { ruby: 0, sapphire: 0, emerald: 0, onyx: 0, pearl: 0 };
         patrons.forEach(patron => {
             let missingForPatron = 0;
@@ -200,6 +226,10 @@ export class GrandmasterAI {
             else if (card.points >= 3) score += (weights.tier3Bonus || 90.0) * 0.7;
             else if (card.points >= 2) score += (weights.tier3Bonus || 90.0) * 0.4;
             else if (card.points >= 1) score += (weights.tier3Bonus || 90.0) * 0.2;
+
+            // Lane synergy bonus: reward cards in uncontested lanes
+            const isLaneMatch = (card.bonus === primaryLane || card.bonus === secondaryLane) ? 1.0 : 0.0;
+            score += isLaneMatch * 35.0;
 
             score += (marketBonusDemand[card.bonus] || 0) * (weights.marketDemandMultiplier || 0.5);
             score += (patronDesirability[card.bonus] || 0) * (weights.patronSynergyMultiplier || 10.0);

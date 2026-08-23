@@ -588,8 +588,8 @@ export class UIRenderer {
             dropdownsHTML += `
                 <div class="discard-row" style="display: flex; align-items: center; justify-content: center; gap: 12px; margin: 10px 0;">
                     <!-- Color Swatch Circle Preview Beside Text -->
-                    <div id="discard-preview-${i}" class="discard-preview-gem token ${defaultColor}" style="width: 38px; height: 38px; min-width: 38px; border-radius: 50%; border: 2.5px solid #fff; box-shadow: 0 3px 8px rgba(0,0,0,0.7);"></div>
-                    <select class="discard-select" data-preview-id="discard-preview-${i}" style="width: 210px; padding: 10px 14px; font-family: inherit; font-size: 1em; font-weight: 700; border-radius: 6px; border: 1.5px solid var(--gold); background: #071526; color: var(--text-gold); cursor: pointer; text-align: left; box-shadow: 0 2px 6px rgba(0,0,0,0.5);">
+                    <div id="discard-preview-${i}" class="discard-preview-gem token ${defaultColor}" style="width: 40px; height: 40px; min-width: 40px; border-radius: 50%; border: 2.5px solid #fff; box-shadow: 0 3px 8px rgba(0,0,0,0.7);"></div>
+                    <select class="discard-select select-gem-${defaultColor}" data-preview-id="discard-preview-${i}" style="width: 220px; padding: 10px 14px; font-family: inherit; font-size: 1.05em; font-weight: 800; border-radius: 8px; cursor: pointer; text-align: left;">
                         ${options}
                     </select>
                 </div>
@@ -599,7 +599,7 @@ export class UIRenderer {
         const currentCount = player.getTotalTokenCount ? player.getTotalTokenCount() : 0;
 
         overlay.innerHTML = `
-            <div class="modal-box" style="max-width: 440px; text-align: center; border: 2px solid #e74c3c;">
+            <div class="modal-box" style="max-width: 450px; text-align: center; border: 2px solid #e74c3c;">
                 <h2 style="color: #e74c3c; margin-top: 0; font-family: 'Cinzel', serif; font-size: 1.5em; letter-spacing: 1.5px;">TOKEN LIMIT EXCEEDED</h2>
                 <p style="font-size: 0.95em; color: var(--text-gold); margin-bottom: 10px;">
                     You hold <b>${currentCount}</b> tokens (maximum 10). You must discard <b>${excess}</b> token(s):
@@ -624,7 +624,7 @@ export class UIRenderer {
             </div>
         `;
 
-        // Attach dynamic onChange listeners so the preview gem swatch updates live
+        // Attach dynamic onChange listeners so the preview gem swatch and select background updates live
         overlay.querySelectorAll('.discard-select').forEach(sel => {
             sel.onchange = (e) => {
                 const targetPreviewId = e.target.dataset.previewId;
@@ -632,6 +632,7 @@ export class UIRenderer {
                 if (previewEl) {
                     previewEl.className = `discard-preview-gem token ${e.target.value}`;
                 }
+                sel.className = `discard-select select-gem-${e.target.value}`;
             };
         });
 
