@@ -8,7 +8,6 @@ window.gameUI = ui;
 // ==========================================
 // SOCKET CONNECTION SETUP
 // ==========================================
-// Auto-detect server URL: localhost for local dev, Render for remote production
 let serverUrl = 'https://gem-merchant-1.onrender.com';
 if (window.location.protocol.startsWith('http')) {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -21,6 +20,24 @@ const socket = io(serverUrl);
 
 socket.on('connect', () => {
     console.log("Connected to Gem Merchant multiplayer server:", socket.id);
+    
+    // Auto-reconnect if session exists
+    const savedSession = sessionStorage.getItem('gem_merchant_session');
+    if (savedSession) {
+        try {
+            const { roomCode, playerName } = JSON.parse(savedSession);
+            if (roomCode && playerName) {
+                console.log(`Auto-reconnecting to room ${roomCode} as ${playerName}`);
+                currentRoomCode = roomCode;
+                myPlayerName = playerName;
+                ui.localPlayerName = playerName;
+                ui.currentRoomCode = roomCode;
+                socket.emit('join_room', { roomCode, playerName });
+            }
+        } catch (e) {
+            sessionStorage.removeItem('gem_merchant_session');
+        }
+    }
 });
 
 socket.on('connect_error', (err) => {
@@ -29,11 +46,12 @@ socket.on('connect_error', (err) => {
 
 // Game & Lobby State
 let selectedTokens = [];
-let chosenPlayerCount = 2; // Default to 2 players
+let chosenPlayerCount = 2;
 let currentRoomCode = null;
 let myPlayerName = 'You';
 let currentGameMode = 'solo'; // 'solo' | 'pass_and_play' | 'online'
 let currentRoomPlayers = [];
+let sfxEnabled = true;
 
 // Audio Helpers
 const sfxPurchase = new Audio('malaysian_cuisine_cards/Apple%20pay%20sucesssound%20track.mp3'); 
@@ -45,7 +63,7 @@ bgMusic.volume = 0.35;
 let isMusicPlaying = false;
 
 function playSound(sound, playbackRate = 1.0) {
-    if (sound) {
+    if (sfxEnabled && sound) {
         sound.currentTime = 0;
         sound.playbackRate = playbackRate;
         sound.play().catch(e => console.log("Audio play error:", e));
@@ -68,16 +86,36 @@ function canLocalPlayerAct() {
     return true;
 }
 
+function copyRoomCodeToClipboard() {
+    if (!currentRoomCode) return;
+    navigator.clipboard.writeText(currentRoomCode).then(() => {
+        ui.showToast(`📋 Room Code <b>${currentRoomCode.toUpperCase()}</b> copied to clipboard!`);
+    }).catch(() => {
+        prompt("Copy this Room Code:", currentRoomCode);
+    });
+}
+
 // ==========================================
 // SOCKET SYNC LISTENERS FOR MULTIPLAYER
 // ==========================================
 socket.on('update_room', (roomData) => {
     console.log("Room players updated:", roomData.players);
     currentRoomPlayers = roomData.players || [];
+    currentRoomCode = roomData.roomCode || currentRoomCode;
+    ui.currentRoomCode = currentRoomCode;
+
+    // Update online statuses inside active game players
+    if (game.players && game.players.length > 0) {
+        game.players.forEach(gp => {
+            const match = currentRoomPlayers.find(rp => rp.name.toLowerCase() === gp.name.toLowerCase());
+            if (match) gp.online = match.online;
+        });
+        ui.renderAll();
+    }
     
     // Update Lobby UI
     const roomCodeDisplay = document.getElementById('lobby-display-room-code');
-    if (roomCodeDisplay) roomCodeDisplay.innerText = roomData.roomCode || currentRoomCode;
+    if (roomCodeDisplay) roomCodeDisplay.innerText = currentRoomCode.toUpperCase();
 
     const countDisplay = document.getElementById('lobby-player-count');
     if (countDisplay) countDisplay.innerText = `${currentRoomPlayers.length}/4`;
@@ -85,12 +123,18 @@ socket.on('update_room', (roomData) => {
     const playerListEl = document.getElementById('lobby-player-list');
     if (playerListEl) {
         playerListEl.innerHTML = currentRoomPlayers.map(p => {
-            const isMe = p.id === socket.id;
+            const isMe = p.name.toLowerCase() === myPlayerName.toLowerCase();
             const isHost = p.isHost;
+            const isOnline = p.online !== false;
             return `
-                <li style="padding: 8px 12px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid ${isMe ? '#2ecc71' : '#5a4b31'}; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: bold; color: ${isMe ? '#2ecc71' : '#e6d3a8'};">${p.name} ${isMe ? '(You)' : ''}</span>
-                    <span style="font-size: 0.75em; color: ${isHost ? '#f1c40f' : '#a38d59'}; text-transform: uppercase;">${isHost ? '👑 Host' : 'Player'}</span>
+                <li style="padding: 8px 12px; background: rgba(0,0,0,0.3); border-radius: 6px; border: 1px solid ${isMe ? '#2ecc71' : '#5a4b31'}; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold; color: ${isMe ? '#2ecc71' : 'var(--text-gold)'}; display: flex; align-items: center; gap: 6px;">
+                        <span class="${isOnline ? 'online-dot' : 'offline-dot'}" title="${isOnline ? 'Online' : 'Offline'}"></span>
+                        ${p.name} ${isMe ? '(You)' : ''}
+                    </span>
+                    <span style="font-size: 0.75em; color: ${isHost ? 'var(--gold)' : 'var(--text-muted)'}; text-transform: uppercase; font-weight: bold;">
+                        ${isHost ? '👑 Host' : (isOnline ? 'Player' : 'Offline')}
+                    </span>
                 </li>
             `;
         }).join('');
@@ -115,48 +159,88 @@ socket.on('update_room', (roomData) => {
     }
 });
 
-// Game Started from Host (All clients load the identical synchronized deck and market)
+socket.on('player_status_changed', ({ playerName, online }) => {
+    const isMe = playerName.toLowerCase() === myPlayerName.toLowerCase();
+    if (!isMe) {
+        if (online) {
+            ui.showToast(`🟢 <b>${playerName}</b> has reconnected to the room!`);
+        } else {
+            ui.showToast(`⚪ <b>${playerName}</b> is currently offline / disconnected.`);
+        }
+    }
+});
+
+// Game Started from Host (First Time)
 socket.on('game_started', (initialState) => {
-    console.log("Game started with synchronized initial state:", initialState);
+    console.log("Game started with initial synchronized state:", initialState);
     
-    // Hide all menu overlays
-    const modeOverlay = document.getElementById('mode-select-overlay');
-    if (modeOverlay) modeOverlay.style.display = 'none';
-    const lobbyOverlay = document.getElementById('online-lobby-overlay');
-    if (lobbyOverlay) lobbyOverlay.style.display = 'none';
+    document.getElementById('mode-select-overlay').style.display = 'none';
+    document.getElementById('online-lobby-overlay').style.display = 'none';
 
     currentGameMode = 'online';
     ui.gameMode = 'online';
     ui.localPlayerName = myPlayerName;
+    ui.currentRoomCode = currentRoomCode;
 
     game.loadInitialState(initialState);
     ui.renderAll();
+    ui.showToast(`🚀 The game has begun! Good luck chefs!`);
+});
+
+// Reconnection Live State Sync (Resumes game right where it left off)
+socket.on('sync_live_state', ({ liveState, reconnect }) => {
+    console.log("Syncing live game state on reconnection:", liveState);
+    
+    document.getElementById('mode-select-overlay').style.display = 'none';
+    document.getElementById('online-lobby-overlay').style.display = 'none';
+
+    currentGameMode = 'online';
+    ui.gameMode = 'online';
+    ui.localPlayerName = myPlayerName;
+    ui.currentRoomCode = currentRoomCode;
+
+    game.loadCurrentState(liveState);
+    ui.renderAll();
+    ui.showToast(`✅ Successfully reconnected to match in Room <b>${currentRoomCode.toUpperCase()}</b>!`);
 });
 
 // Sync Turn Actions across connected clients
-socket.on('sync_game_state', (actionData) => {
+socket.on('sync_game_state', ({ actionData, fullState }) => {
     console.log("Received action sync:", actionData);
     try {
-        if (actionData.type === 'TAKE_DIFFERENT') {
-            game.takeDifferentResources(actionData.tokens);
-            playSound(sfxToken, 1.6);
-        } else if (actionData.type === 'TAKE_TWO') {
-            game.takeTwoResources(actionData.resource);
-            playSound(sfxToken, 1.6);
-        } else if (actionData.type === 'BUY_CARD') {
-            game.purchaseVisibleCard(actionData.tier, actionData.cardId);
-            playSound(sfxPurchase, 1.5);
-        } else if (actionData.type === 'RESERVE_CARD') {
-            game.reserveVisibleCard(actionData.tier, actionData.cardId);
-            playSound(sfxReserve, 1.2);
-        } else if (actionData.type === 'BUY_RESERVED') {
-            game.purchaseReservedCard(actionData.cardId);
-            playSound(sfxPurchase, 1.5);
-        } else if (actionData.type === 'DISCARD_TOKENS') {
-            game.discardTokens(actionData.tokens);
+        if (fullState) {
+            game.loadCurrentState(fullState);
+        } else if (actionData) {
+            if (actionData.type === 'TAKE_DIFFERENT') {
+                game.takeDifferentResources(actionData.tokens);
+            } else if (actionData.type === 'TAKE_TWO') {
+                game.takeTwoResources(actionData.resource);
+            } else if (actionData.type === 'BUY_CARD') {
+                game.purchaseVisibleCard(actionData.tier, actionData.cardId);
+            } else if (actionData.type === 'RESERVE_CARD') {
+                game.reserveVisibleCard(actionData.tier, actionData.cardId);
+            } else if (actionData.type === 'BUY_RESERVED') {
+                game.purchaseReservedCard(actionData.cardId);
+            } else if (actionData.type === 'DISCARD_TOKENS') {
+                game.discardTokens(actionData.tokens);
+            }
+        }
+
+        // Action audio & toasts
+        if (actionData) {
+            if (actionData.type === 'TAKE_DIFFERENT' || actionData.type === 'TAKE_TWO') {
+                playSound(sfxToken, 1.6);
+            } else if (actionData.type === 'BUY_CARD' || actionData.type === 'BUY_RESERVED') {
+                playSound(sfxPurchase, 1.5);
+                ui.showToast(`✦ A cuisine card was acquired!`);
+            } else if (actionData.type === 'RESERVE_CARD') {
+                playSound(sfxReserve, 1.2);
+                ui.showToast(`✦ A cuisine card was reserved.`);
+            }
         }
     } catch (err) {
         console.error("Error executing synced action:", err);
+        if (fullState) game.loadCurrentState(fullState);
     }
     ui.renderAll();
 });
@@ -181,12 +265,46 @@ document.addEventListener('click', (e) => {
         return;
     }
 
+    // SFX Toggle Button
+    if (e.target.id === 'sfx-toggle-btn') {
+        sfxEnabled = !sfxEnabled;
+        e.target.textContent = sfxEnabled ? '🔔 SFX: ON' : '🔕 SFX: OFF';
+        return;
+    }
+
+    // Copy Room Code click handlers
+    if (e.target.id === 'lobby-copy-code-btn' || e.target.closest('#in-game-room-badge')) {
+        copyRoomCodeToClipboard();
+        return;
+    }
+
+    // Rules Modal Handlers
+    if (e.target.id === 'nav-rules-btn' || e.target.id === 'open-rules-menu-btn') {
+        document.getElementById('rules-modal').style.display = 'flex';
+        return;
+    }
+    if (e.target.id === 'close-rules-btn' || e.target.id === 'close-rules-bottom-btn' || e.target.id === 'rules-modal') {
+        document.getElementById('rules-modal').style.display = 'none';
+        return;
+    }
+
+    // Leave Game Button Handler
+    if (e.target.id === 'leave-game-btn') {
+        if (confirm("Are you sure you want to leave the current match?")) {
+            sessionStorage.removeItem('gem_merchant_session');
+            window.location.reload();
+        }
+        return;
+    }
+
     // Player Count Button Selector (for Solo and Pass & Play)
     if (e.target.classList.contains('player-count-btn')) {
         document.querySelectorAll('.player-count-btn').forEach(btn => {
-            btn.style.background = 'linear-gradient(to bottom, #ebd197, #c49c47)';
-            btn.style.color = '#1a0f00';
+            btn.className = 'player-count-btn res-btn';
+            btn.style.background = 'linear-gradient(to bottom, #5a4b31, #3a2f1e)';
+            btn.style.color = 'var(--text-gold)';
         });
+        e.target.className = 'player-count-btn buy-btn';
         e.target.style.background = '#f1c40f';
         e.target.style.color = '#1a0f00';
         chosenPlayerCount = parseInt(e.target.dataset.count);
@@ -195,50 +313,48 @@ document.addEventListener('click', (e) => {
 
     // Solo Mode Button Handler
     if (e.target.id === 'mode-solo-btn') {
-        const overlay = document.getElementById('mode-select-overlay');
-        if (overlay) overlay.style.display = 'none';
+        document.getElementById('mode-select-overlay').style.display = 'none';
         
         currentGameMode = 'solo';
         myPlayerName = 'You';
         ui.gameMode = 'solo';
         ui.localPlayerName = 'You';
+        ui.currentRoomCode = null;
 
         const names = ['You'];
         for (let i = 1; i < chosenPlayerCount; i++) {
             names.push(`Bot ${i}`);
         }
-        game.initializeGame(names, true); // true = Vs AI mode
+        game.initializeGame(names, true);
         ui.renderAll();
+        ui.showToast("🤖 Solo game started against AI Bots. Your turn!");
         return;
     }
 
     // Pass & Play Mode Button Handler
     if (e.target.id === 'mode-multi-btn') {
-        const overlay = document.getElementById('mode-select-overlay');
-        if (overlay) overlay.style.display = 'none';
+        document.getElementById('mode-select-overlay').style.display = 'none';
         
         currentGameMode = 'pass_and_play';
-        myPlayerName = 'Player 1';
+        myPlayerName = 'Chef 1';
         ui.gameMode = 'pass_and_play';
-        ui.localPlayerName = 'Player 1';
+        ui.localPlayerName = 'Chef 1';
+        ui.currentRoomCode = null;
 
         const names = [];
-        const possibleNames = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
-        for (let i = 0; i < chosenPlayerCount; i++) {
-            names.push(possibleNames[i]);
+        for (let i = 1; i <= chosenPlayerCount; i++) {
+            names.push(`Chef ${i}`);
         }
         game.initializeGame(names, false);
         ui.renderAll();
+        ui.showToast("👥 Pass & Play game started! Pass the screen on each turn.");
         return;
     }
 
     // Open Online Lobby Button Handler
     if (e.target.id === 'join-online-room-btn') {
-        const modeOverlay = document.getElementById('mode-select-overlay');
-        if (modeOverlay) modeOverlay.style.display = 'none';
-        
-        const lobbyOverlay = document.getElementById('online-lobby-overlay');
-        if (lobbyOverlay) lobbyOverlay.style.display = 'flex';
+        document.getElementById('mode-select-overlay').style.display = 'none';
+        document.getElementById('online-lobby-overlay').style.display = 'flex';
 
         document.getElementById('lobby-join-form').style.display = 'flex';
         document.getElementById('lobby-room-view').style.display = 'none';
@@ -265,6 +381,10 @@ document.addEventListener('click', (e) => {
         currentRoomCode = roomCode;
         myPlayerName = playerName;
         ui.localPlayerName = playerName;
+        ui.currentRoomCode = roomCode;
+
+        // Persist session for reconnection
+        sessionStorage.setItem('gem_merchant_session', JSON.stringify({ roomCode, playerName }));
 
         socket.emit('join_room', { roomCode: currentRoomCode, playerName: myPlayerName });
 
@@ -282,6 +402,7 @@ document.addEventListener('click', (e) => {
 
     // Lobby Leave Room Button
     if (e.target.id === 'lobby-leave-room-btn') {
+        sessionStorage.removeItem('gem_merchant_session');
         window.location.reload();
         return;
     }
@@ -304,7 +425,7 @@ document.addEventListener('click', (e) => {
     // Token Selection in Bank
     if (e.target.classList.contains('bank-token')) {
         if (!canLocalPlayerAct()) {
-            alert("Please wait for your turn!");
+            ui.showToast("⏳ Please wait for your turn!");
             return;
         }
 
@@ -320,7 +441,7 @@ document.addEventListener('click', (e) => {
                 if (bankCount >= 4) {
                     selectedTokens.push(resource);
                 } else {
-                    alert(`To take 2 of the same token, the bank must have at least 4 available.`);
+                    alert(`To take 2 tokens of the same color, the bank must have at least 4 available.`);
                 }
             } else {
                 selectedTokens = selectedTokens.filter(r => r !== resource);
@@ -336,27 +457,32 @@ document.addEventListener('click', (e) => {
     // Confirm Tokens Action
     if (e.target.id === 'confirm-tokens-btn') {
         if (!canLocalPlayerAct()) {
-            alert("Please wait for your turn!");
+            ui.showToast("⏳ Please wait for your turn!");
             return;
         }
 
         try {
             if (selectedTokens.length === 0) return;
             const unique = new Set(selectedTokens);
+            let actionData = null;
 
             if (unique.size === selectedTokens.length) {
                 game.takeDifferentResources(selectedTokens);
-                if (currentGameMode === 'online' && currentRoomCode) {
-                    socket.emit('game_action', { roomCode: currentRoomCode, actionData: { type: 'TAKE_DIFFERENT', tokens: selectedTokens } });
-                }
+                actionData = { type: 'TAKE_DIFFERENT', tokens: selectedTokens };
             } else if (selectedTokens.length === 2 && selectedTokens[0] === selectedTokens[1]) {
                 const res = selectedTokens[0];
                 game.takeTwoResources(res);
-                if (currentGameMode === 'online' && currentRoomCode) {
-                    socket.emit('game_action', { roomCode: currentRoomCode, actionData: { type: 'TAKE_TWO', resource: res } });
-                }
+                actionData = { type: 'TAKE_TWO', resource: res };
             }
             playSound(sfxToken, 1.6);
+
+            if (currentGameMode === 'online' && currentRoomCode && actionData) {
+                socket.emit('game_action', {
+                    roomCode: currentRoomCode,
+                    actionData,
+                    fullState: game.serializeCurrentState()
+                });
+            }
 
             selectedTokens = [];
             ui.renderAll();
@@ -373,7 +499,7 @@ document.addEventListener('click', (e) => {
     // Purchase Visible Card
     if (e.target.classList.contains('buy-btn') && e.target.dataset.tier && e.target.dataset.id) {
         if (!canLocalPlayerAct()) {
-            alert("Please wait for your turn!");
+            ui.showToast("⏳ Please wait for your turn!");
             return;
         }
 
@@ -384,7 +510,11 @@ document.addEventListener('click', (e) => {
             playSound(sfxPurchase, 1.5);
 
             if (currentGameMode === 'online' && currentRoomCode) {
-                socket.emit('game_action', { roomCode: currentRoomCode, actionData: { type: 'BUY_CARD', tier, cardId } });
+                socket.emit('game_action', {
+                    roomCode: currentRoomCode,
+                    actionData: { type: 'BUY_CARD', tier, cardId },
+                    fullState: game.serializeCurrentState()
+                });
             }
 
             ui.renderAll();
@@ -396,7 +526,7 @@ document.addEventListener('click', (e) => {
     // Reserve Visible Card
     if (e.target.classList.contains('res-btn') && e.target.dataset.tier && e.target.dataset.id) {
         if (!canLocalPlayerAct()) {
-            alert("Please wait for your turn!");
+            ui.showToast("⏳ Please wait for your turn!");
             return;
         }
 
@@ -407,7 +537,11 @@ document.addEventListener('click', (e) => {
             playSound(sfxReserve, 1.2);
 
             if (currentGameMode === 'online' && currentRoomCode) {
-                socket.emit('game_action', { roomCode: currentRoomCode, actionData: { type: 'RESERVE_CARD', tier, cardId } });
+                socket.emit('game_action', {
+                    roomCode: currentRoomCode,
+                    actionData: { type: 'RESERVE_CARD', tier, cardId },
+                    fullState: game.serializeCurrentState()
+                });
             }
 
             ui.renderAll();
@@ -419,7 +553,7 @@ document.addEventListener('click', (e) => {
     // Purchase Reserved Card
     if (e.target.classList.contains('buy-res-btn') && e.target.dataset.id) {
         if (!canLocalPlayerAct()) {
-            alert("Please wait for your turn!");
+            ui.showToast("⏳ Please wait for your turn!");
             return;
         }
 
@@ -429,7 +563,11 @@ document.addEventListener('click', (e) => {
             playSound(sfxPurchase, 1.5);
 
             if (currentGameMode === 'online' && currentRoomCode) {
-                socket.emit('game_action', { roomCode: currentRoomCode, actionData: { type: 'BUY_RESERVED', cardId } });
+                socket.emit('game_action', {
+                    roomCode: currentRoomCode,
+                    actionData: { type: 'BUY_RESERVED', cardId },
+                    fullState: game.serializeCurrentState()
+                });
             }
 
             ui.renderAll();
@@ -448,7 +586,11 @@ document.addEventListener('click', (e) => {
             game.discardTokens(tokensToDiscard);
 
             if (currentGameMode === 'online' && currentRoomCode) {
-                socket.emit('game_action', { roomCode: currentRoomCode, actionData: { type: 'DISCARD_TOKENS', tokens: tokensToDiscard } });
+                socket.emit('game_action', {
+                    roomCode: currentRoomCode,
+                    actionData: { type: 'DISCARD_TOKENS', tokens: tokensToDiscard },
+                    fullState: game.serializeCurrentState()
+                });
             }
 
             ui.hideDiscardModal();

@@ -24,91 +24,133 @@ const rooms = {};
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
-    // Player joins a room with a room code & player name
+    // Player joins or reconnects to a room
     socket.on('join_room', ({ roomCode, playerName }) => {
         if (!roomCode || !playerName) return;
 
-        socket.join(roomCode);
-        console.log(`${playerName} (${socket.id}) joined room: ${roomCode}`);
+        const normalizedRoom = roomCode.trim().toLowerCase();
+        const trimmedName = playerName.trim();
+        socket.join(normalizedRoom);
 
-        if (!rooms[roomCode]) {
-            rooms[roomCode] = {
+        if (!rooms[normalizedRoom]) {
+            rooms[normalizedRoom] = {
+                roomCode: normalizedRoom,
                 hostId: socket.id,
                 players: [],
                 gameStarted: false,
-                initialState: null
+                initialState: null,
+                currentLiveState: null,
+                actionLog: []
             };
         }
 
-        const room = rooms[roomCode];
+        const room = rooms[normalizedRoom];
 
-        // Remove old socket for same player if reconnecting
-        room.players = room.players.filter(p => p.id !== socket.id);
-        const isHost = room.players.length === 0 || room.hostId === socket.id;
-        if (isHost) {
-            room.hostId = socket.id;
+        // Check if player is reconnecting with the same name
+        const existingPlayer = room.players.find(p => p.name.toLowerCase() === trimmedName.toLowerCase());
+
+        if (existingPlayer) {
+            existingPlayer.id = socket.id;
+            existingPlayer.online = true;
+            console.log(`Player ${trimmedName} RECONNECTED to room ${normalizedRoom}`);
+        } else {
+            // New player joining
+            const isHost = room.players.length === 0 || room.hostId === socket.id;
+            if (isHost) room.hostId = socket.id;
+
+            room.players.push({
+                id: socket.id,
+                name: trimmedName,
+                isHost: isHost,
+                online: true
+            });
+            console.log(`Player ${trimmedName} JOINED room ${normalizedRoom}`);
         }
 
-        room.players.push({
-            id: socket.id,
-            name: playerName.trim(),
-            isHost: isHost
-        });
-
         // Broadcast updated room info
-        io.to(roomCode).emit('update_room', {
-            roomCode,
+        io.to(normalizedRoom).emit('update_room', {
+            roomCode: room.roomCode,
             hostId: room.hostId,
             players: room.players,
             gameStarted: room.gameStarted
         });
 
-        // If game is already underway, send the initial setup to reconnecting player
-        if (room.gameStarted && room.initialState) {
-            socket.emit('game_started', room.initialState);
+        // If the game is already in progress, send the latest LIVE state to reconnecting player
+        if (room.gameStarted) {
+            if (room.currentLiveState) {
+                socket.emit('sync_live_state', { liveState: room.currentLiveState, reconnect: true });
+            } else if (room.initialState) {
+                socket.emit('game_started', room.initialState);
+            }
         }
     });
 
-    // Host starts the game and broadcasts the synchronized initial state (decks, market, patrons)
+    // Host starts the game and broadcasts the initial synchronized state
     socket.on('start_game', ({ roomCode, initialState }) => {
-        const room = rooms[roomCode];
+        const normalizedRoom = roomCode.trim().toLowerCase();
+        const room = rooms[normalizedRoom];
         if (room) {
             room.gameStarted = true;
             room.initialState = initialState;
-            io.to(roomCode).emit('game_started', initialState);
-            console.log(`Game started in room: ${roomCode} with ${room.players.length} players.`);
+            room.currentLiveState = initialState;
+            io.to(normalizedRoom).emit('game_started', initialState);
+            console.log(`Game started in room: ${normalizedRoom} with ${room.players.length} players.`);
         }
     });
 
-    // Broadcast a player turn action to all other players in the room
-    socket.on('game_action', ({ roomCode, actionData }) => {
-        console.log(`Action in ${roomCode}:`, actionData);
-        socket.to(roomCode).emit('sync_game_state', actionData);
+    // Broadcast a player turn action and cache the current live state for reconnects
+    socket.on('game_action', ({ roomCode, actionData, fullState }) => {
+        const normalizedRoom = roomCode.trim().toLowerCase();
+        const room = rooms[normalizedRoom];
+        if (room) {
+            if (fullState) {
+                room.currentLiveState = fullState;
+            }
+            if (actionData) {
+                room.actionLog.push({ ...actionData, timestamp: Date.now() });
+                if (room.actionLog.length > 50) room.actionLog.shift();
+            }
+            // Broadcast to other players in room
+            socket.to(normalizedRoom).emit('sync_game_state', { actionData, fullState });
+        }
     });
 
-    // Handle disconnection
+    // Handle player disconnection
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);
-        for (const roomCode in rooms) {
-            const room = rooms[roomCode];
-            const playerIndex = room.players.findIndex(p => p.id === socket.id);
-            if (playerIndex !== -1) {
-                room.players.splice(playerIndex, 1);
-                if (room.players.length === 0) {
-                    delete rooms[roomCode];
-                    console.log(`Room ${roomCode} closed (empty).`);
-                } else {
-                    if (room.hostId === socket.id) {
+        for (const normalizedRoom in rooms) {
+            const room = rooms[normalizedRoom];
+            const player = room.players.find(p => p.id === socket.id);
+            
+            if (player) {
+                player.online = false;
+                console.log(`Player ${player.name} went OFFLINE in room ${normalizedRoom}`);
+
+                // If game hasn't started yet, remove player from lobby
+                if (!room.gameStarted) {
+                    room.players = room.players.filter(p => p.id !== socket.id);
+                    if (room.players.length === 0) {
+                        delete rooms[normalizedRoom];
+                        console.log(`Lobby room ${normalizedRoom} deleted (empty).`);
+                        continue;
+                    } else if (room.hostId === socket.id) {
                         room.hostId = room.players[0].id;
                         room.players[0].isHost = true;
                     }
-                    io.to(roomCode).emit('update_room', {
-                        roomCode,
-                        hostId: room.hostId,
-                        players: room.players,
-                        gameStarted: room.gameStarted
-                    });
                 }
+
+                // Notify remaining players about offline status
+                io.to(normalizedRoom).emit('update_room', {
+                    roomCode: room.roomCode,
+                    hostId: room.hostId,
+                    players: room.players,
+                    gameStarted: room.gameStarted
+                });
+
+                io.to(normalizedRoom).emit('player_status_changed', {
+                    playerName: player.name,
+                    online: false
+                });
             }
         }
     });

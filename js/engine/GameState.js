@@ -110,6 +110,38 @@ export class GameState {
         };
     }
 
+    serializeCurrentState() {
+        return {
+            isVsAi: this.isVsAi,
+            currentPlayerIndex: this.currentPlayerIndex,
+            turnNumber: this.turnNumber,
+            isGameOver: this.isGameOver,
+            isFinalRound: this.isFinalRound,
+            needsToDiscard: this.needsToDiscard,
+            bank: { ...this.bank.tokens },
+            players: this.players.map(p => ({
+                name: p.name,
+                tokens: { ...p.tokens },
+                bonuses: { ...p.bonuses },
+                prestige: p.prestige,
+                purchasedCards: p.purchasedCards.map(c => ({ id: c.id, tier: c.tier, points: c.points, bonus: c.bonus, cost: c.cost, artIndex: c.artIndex })),
+                reservedCards: p.reservedCards.map(c => ({ id: c.id, tier: c.tier, points: c.points, bonus: c.bonus, cost: c.cost, artIndex: c.artIndex })),
+                patrons: p.patrons.map(pt => ({ id: pt.id, points: pt.points, requirements: pt.requirements }))
+            })),
+            decks: {
+                1: this.decks[1].cards.map(c => ({ id: c.id, tier: c.tier, points: c.points, bonus: c.bonus, cost: c.cost, artIndex: c.artIndex })),
+                2: this.decks[2].cards.map(c => ({ id: c.id, tier: c.tier, points: c.points, bonus: c.bonus, cost: c.cost, artIndex: c.artIndex })),
+                3: this.decks[3].cards.map(c => ({ id: c.id, tier: c.tier, points: c.points, bonus: c.bonus, cost: c.cost, artIndex: c.artIndex }))
+            },
+            visibleMarket: {
+                1: this.visibleMarket[1].map(c => ({ id: c.id, tier: c.tier, points: c.points, bonus: c.bonus, cost: c.cost, artIndex: c.artIndex })),
+                2: this.visibleMarket[2].map(c => ({ id: c.id, tier: c.tier, points: c.points, bonus: c.bonus, cost: c.cost, artIndex: c.artIndex })),
+                3: this.visibleMarket[3].map(c => ({ id: c.id, tier: c.tier, points: c.points, bonus: c.bonus, cost: c.cost, artIndex: c.artIndex }))
+            },
+            availablePatrons: this.availablePatrons.map(p => ({ id: p.id, points: p.points, requirements: p.requirements }))
+        };
+    }
+
     loadInitialState(data) {
         this.players = data.playerNames.map(name => new Player(name));
         this.isVsAi = data.isVsAi || false;
@@ -120,6 +152,41 @@ export class GameState {
         this.isGameOver = false;
         this.isFinalRound = false;
         this.needsToDiscard = false;
+
+        this.decks = {
+            1: new Deck(1, data.decks[1].map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex)), false),
+            2: new Deck(2, data.decks[2].map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex)), false),
+            3: new Deck(3, data.decks[3].map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex)), false)
+        };
+        this.visibleMarket = {
+            1: data.visibleMarket[1].map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex)),
+            2: data.visibleMarket[2].map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex)),
+            3: data.visibleMarket[3].map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex))
+        };
+        this.availablePatrons = data.availablePatrons.map(p => new Patron(p.id, p.points, p.requirements));
+    }
+
+    loadCurrentState(data) {
+        this.isVsAi = data.isVsAi || false;
+        this.currentPlayerIndex = data.currentPlayerIndex || 0;
+        this.turnNumber = data.turnNumber || 1;
+        this.isGameOver = data.isGameOver || false;
+        this.isFinalRound = data.isFinalRound || false;
+        this.needsToDiscard = data.needsToDiscard || false;
+        
+        this.bank = new ResourceBank();
+        this.bank.tokens = { ...data.bank };
+
+        this.players = data.players.map(pd => {
+            const p = new Player(pd.name);
+            p.tokens = { ...pd.tokens };
+            p.bonuses = { ...pd.bonuses };
+            p.prestige = pd.prestige || 0;
+            p.purchasedCards = (pd.purchasedCards || []).map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex));
+            p.reservedCards = (pd.reservedCards || []).map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex));
+            p.patrons = (pd.patrons || []).map(pt => new Patron(pt.id, pt.points, pt.requirements));
+            return p;
+        });
 
         this.decks = {
             1: new Deck(1, data.decks[1].map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex)), false),

@@ -5,6 +5,7 @@ export class UIRenderer {
         this.game = gameState;
         this.localPlayerName = 'You';
         this.gameMode = 'solo'; // 'solo' | 'pass_and_play' | 'online'
+        this.currentRoomCode = null;
         this.setupCardZoomModal();
     }
 
@@ -38,13 +39,29 @@ export class UIRenderer {
         return true;
     }
 
+    showToast(message) {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerHTML = message;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => toast.remove(), 500);
+        }, 3500);
+    }
+
     getCardArtPath(card) {
         const photoIndex = card.artIndex || 1;
         return `malaysian_cuisine_cards/card_t1_${photoIndex}.png`;
     }
 
     getPatronArtPath(index) {
-        const totalPatronPhotos = 5; // Updated to use all 5 unique patron photos
+        const totalPatronPhotos = 5;
         const patronIndex = (index % totalPatronPhotos) + 1;
         return `malaysian_cuisine_cards/patron_${patronIndex}.jpg`;
     }
@@ -81,12 +98,8 @@ export class UIRenderer {
         if (!modal) {
             modal = document.createElement('div');
             modal.id = 'card-zoom-modal';
-            Object.assign(modal.style, {
-                position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-                backgroundColor: 'rgba(4, 13, 22, 0.85)', display: 'none',
-                justifyContent: 'center', alignItems: 'center', zIndex: 2500,
-                backdropFilter: 'blur(3px)'
-            });
+            modal.className = 'modal-overlay';
+            modal.style.display = 'none';
             document.body.appendChild(modal);
 
             modal.onclick = (e) => {
@@ -111,24 +124,24 @@ export class UIRenderer {
             .join('');
 
         modal.innerHTML = `
-            <div style="background: #0b1c2c; padding: 30px; border-radius: 12px; border: 2px solid #d4af37; display: flex; gap: 30px; max-width: 500px; width: 90%; box-shadow: 0 15px 35px rgba(0,0,0,0.8); position: relative;">
-                <button id="close-zoom-btn" style="position: absolute; top: 10px; right: 15px; background: none; border: none; color: #e6d3a8; font-size: 1.5em; cursor: pointer;">&times;</button>
+            <div class="modal-box" style="display: flex; gap: 25px; max-width: 520px; text-align: left; position: relative;">
+                <button id="close-zoom-btn" style="position: absolute; top: 10px; right: 15px; background: none; border: none; color: var(--text-gold); font-size: 1.6em; cursor: pointer;">&times;</button>
                 
-                <div style="width: 180px; height: 266px; background-image: url('${artPath}'); background-size: cover; background-position: center; border-radius: 8px; border: 2px solid #d4af37; position: relative; flex-shrink: 0;">
-                    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(11, 28, 44, 0.7) 0%, rgba(11, 28, 44, 0.2) 50%, rgba(11, 28, 44, 0.8) 100%); border-radius: 6px; pointer-events: none;"></div>
+                <div style="width: 170px; height: 250px; background-image: url('${artPath}'); background-size: cover; background-position: center; border-radius: 8px; border: 2px solid var(--panel-border); position: relative; flex-shrink: 0; box-shadow: 0 8px 20px rgba(0,0,0,0.8);">
+                    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(11, 28, 44, 0.6) 0%, transparent 50%, rgba(11, 28, 44, 0.8) 100%); border-radius: 6px; pointer-events: none;"></div>
                     <div style="position: relative; z-index: 2; padding: 10px; display: flex; justify-content: space-between; align-items: flex-start;">
-                        <span style="font-size: 1.8em; font-weight: bold; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.9);">${points > 0 ? points : ''}</span>
+                        <span style="font-family: 'Cinzel', serif; font-size: 1.8em; font-weight: 900; color: #fff; text-shadow: 1px 1px 4px rgba(0,0,0,0.9);">${points > 0 ? points : ''}</span>
                         ${bonus}
                     </div>
                 </div>
 
-                <div style="display: flex; flex-direction: column; justify-content: center; color: #e6d3a8; flex-grow: 1; font-family: sans-serif;">
-                    <h3 style="font-family: 'Cinzel', serif; color: #d4af37; margin-top: 0; margin-bottom: 15px; font-size: 1.3em; border-bottom: 1px solid #5a4b31; padding-bottom: 8px;">${isPatron ? 'Patron Details' : 'Card Inspection'}</h3>
+                <div style="display: flex; flex-direction: column; justify-content: center; color: var(--text-gold); flex-grow: 1;">
+                    <h3 style="font-family: 'Cinzel', serif; color: var(--gold); margin-top: 0; margin-bottom: 12px; font-size: 1.3em; border-bottom: 1px solid #5a4b31; padding-bottom: 6px;">${isPatron ? 'Patron Visit' : 'Cuisine Card'}</h3>
                     <div style="margin-bottom: 15px;">
-                        <b style="font-family: 'Cinzel', serif; color: #f2d08a; font-size: 0.9em; text-transform: uppercase;">${isPatron ? 'Requirements' : 'Acquisition Cost'}:</b>
-                        <div style="margin-top: 8px; max-height: 150px; overflow-y: auto;">${costHTML || 'None'}</div>
+                        <b style="color: var(--gold-light); font-size: 0.85em; text-transform: uppercase;">${isPatron ? 'Bonus Requirements' : 'Token Cost'}:</b>
+                        <div style="margin-top: 8px; max-height: 140px; overflow-y: auto;">${costHTML || 'None'}</div>
                     </div>
-                    <button id="modal-close-action" class="buy-btn" style="margin-top: auto; padding: 8px; font-size: 0.9em; width: 100%;">Close Inspection</button>
+                    <button id="modal-close-action" class="buy-btn" style="margin-top: auto; padding: 8px; font-size: 0.85em; width: 100%;">Close Preview</button>
                 </div>
             </div>
         `;
@@ -140,6 +153,16 @@ export class UIRenderer {
 
     updateHeader() {
         const statusEl = document.getElementById('game-status');
+        const roomBadge = document.getElementById('in-game-room-badge');
+        const roomText = document.getElementById('header-room-code-text');
+
+        if (this.gameMode === 'online' && this.currentRoomCode) {
+            if (roomBadge) roomBadge.style.display = 'flex';
+            if (roomText) roomText.innerText = this.currentRoomCode;
+        } else {
+            if (roomBadge) roomBadge.style.display = 'none';
+        }
+
         if (!statusEl) return;
         
         if (this.game.isGameOver) {
@@ -157,7 +180,7 @@ export class UIRenderer {
             } else if (this.isCurrentPlayerLocal()) {
                 statusEl.innerHTML = `<div class="turn-banner my-turn">⭐ YOUR TURN (${playerName.toUpperCase()}) ⭐</div>`;
             } else {
-                statusEl.innerHTML = `<div class="turn-banner" style="color: #e6d3a8; border-color: #5a4b31;">⏳ WAITING FOR ${playerName.toUpperCase()}'S TURN...</div>`;
+                statusEl.innerHTML = `<div class="turn-banner waiting-turn">⏳ WAITING FOR ${playerName.toUpperCase()}'S MOVE...</div>`;
             }
         }
     }
@@ -167,16 +190,20 @@ export class UIRenderer {
         if (!container) return;
         
         container.innerHTML = `
-            <div style="font-size: 0.8em; color: #e6d3a8; text-transform: uppercase; text-align: center; margin-bottom: 10px; font-weight: bold; letter-spacing: 1px;">
-                Bank Tokens <br><span style="font-size: 0.7em; color: #a38d59;">(Click to select)</span>
+            <div style="font-size: 0.85em; color: var(--gold); text-transform: uppercase; text-align: center; margin-bottom: 8px; font-weight: bold; letter-spacing: 1px; font-family: 'Cinzel', serif;">
+                Bank Tokens
+            </div>
+            <div style="font-size: 0.7em; color: var(--text-muted); text-align: center; margin-bottom: 12px; line-height: 1.3;">
+                Pick 3 different OR 2 same (if 4+ available)
             </div>
             
             <div class="bank-token-vertical-list" id="tokens-list"></div>
             
-            <div id="bank-actions" style="visibility: hidden; display: flex; flex-direction: column; gap: 8px; margin-top: 15px; width: 100%;">
-                <span id="pending-tokens-display" style="text-align: center; color: #e6d3a8; font-family: sans-serif; font-size: 0.75em; text-transform: uppercase;"></span>
-                <button id="confirm-tokens-btn" class="buy-btn" style="width: 100%; padding: 6px;">Confirm</button>
-                <button id="clear-tokens-btn" class="res-btn" style="width: 100%; padding: 6px;">Clear</button>
+            <div id="bank-actions" style="visibility: hidden; display: flex; flex-direction: column; gap: 8px; margin-top: 15px; width: 100%; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; border: 1px solid rgba(212,175,55,0.3);">
+                <div style="font-size: 0.7em; text-transform: uppercase; color: var(--text-muted); text-align: center;">Selected Tokens:</div>
+                <span id="pending-tokens-display" style="text-align: center; color: var(--text-gold); font-size: 0.8em; min-height: 18px;"></span>
+                <button id="confirm-tokens-btn" class="buy-btn" style="width: 100%; padding: 7px;">Confirm Tokens</button>
+                <button id="clear-tokens-btn" class="res-btn" style="width: 100%; padding: 6px;">Clear Selection</button>
             </div>
         `;
         
@@ -209,8 +236,13 @@ export class UIRenderer {
     renderPatrons() {
         const container = document.getElementById('patrons-container');
         if (!container) return;
-        container.dataset.label = "TIER";
-        container.innerHTML = '<div class="patron-row-title">PATRONS</div>';
+        
+        container.innerHTML = `
+            <div class="patron-row-title">
+                <span>👑 NOBLE PATRONS (+3 PTS)</span>
+                <span class="deck-count-indicator">${this.game.availablePatrons ? this.game.availablePatrons.length : 0} Available</span>
+            </div>
+        `;
         
         const grid = document.createElement('div');
         grid.className = 'card-grid';
@@ -219,6 +251,8 @@ export class UIRenderer {
             this.game.availablePatrons.forEach((patron, index) => {
                 const pDiv = document.createElement('div');
                 pDiv.className = 'card patron-card zoomable-card'; 
+                pDiv.style.width = '100px';
+                pDiv.style.height = '120px';
                 
                 const patronArt = this.getPatronArtPath(index);
                 pDiv.style.backgroundImage = `url('${patronArt}')`;
@@ -237,7 +271,7 @@ export class UIRenderer {
                     <div class="card-header">
                         <div class="card-points">${patron.points > 0 ? patron.points : ''}</div>
                     </div>
-                    <div class="splendor-cost-container">
+                    <div class="splendor-cost-container" style="flex-direction: row; flex-wrap: wrap;">
                         ${reqString}
                     </div>
                 `;
@@ -252,11 +286,20 @@ export class UIRenderer {
         const currentPlayer = this.game.getCurrentPlayer ? this.game.getCurrentPlayer() : null;
         const isMyTurn = this.isCurrentPlayerLocal();
 
+        const tierNames = { 3: 'TIER 3 (GOURMET)', 2: 'TIER 2 (SPECIALTY)', 1: 'TIER 1 (STREET FOOD)' };
+
         for (let tier = 1; tier <= 3; tier++) {
             const container = document.getElementById(`market-tier-${tier}`);
             if (!container) continue;
-            container.dataset.label = `TIER`;
-            container.innerHTML = `<div class="patron-row-title">TIER ${tier}</div>`; 
+            
+            const remainingDeck = this.game.decks && this.game.decks[tier] ? this.game.decks[tier].cards.length : 0;
+
+            container.innerHTML = `
+                <div class="patron-row-title">
+                    <span>${tierNames[tier]}</span>
+                    <span class="deck-count-indicator">Deck: ${remainingDeck} cards</span>
+                </div>
+            `; 
             
             const grid = document.createElement('div');
             grid.className = 'card-grid';
@@ -315,39 +358,43 @@ export class UIRenderer {
     renderPlayers() {
         const container = document.getElementById('players-sidebar');
         if (!container) return;
-        container.innerHTML = '<h2 style="color: #e6d3a8; margin-bottom: 5px; font-size: 1em;">PLAYERS</h2>';
+        container.innerHTML = '<div style="font-family: \'Cinzel\', serif; color: var(--gold); margin-bottom: 8px; font-size: 0.9em; font-weight: bold;">CHEF DASHBOARDS</div>';
 
         if (!this.game.players || this.game.players.length === 0) return;
+
+        // Determine point leader for crown icon
+        const maxPoints = Math.max(...this.game.players.map(p => p.prestige || 0));
 
         this.game.players.forEach((player, index) => {
             const isActive = index === this.game.currentPlayerIndex;
             const isUser = this.isPlayerLocal(player); 
+            const isLeader = player.prestige > 0 && player.prestige === maxPoints;
+            const isOnline = player.online !== false;
+
             const playerDiv = document.createElement('div');
             playerDiv.className = `player-board ${isActive ? 'active-player' : ''}`;
             
             const tokensString = Object.entries(player.tokens || {})
                 .filter(([_, amt]) => amt > 0)
-                .map(([res, amt]) => `<span class="inline-gem"><span class="mini-dot gem-${res}"></span> ${amt}</span>`).join(' &nbsp; ') || 'None';
+                .map(([res, amt]) => `<span class="inline-gem"><span class="mini-dot gem-${res}"></span> ${amt}</span>`).join(' ') || '<span style="color: var(--text-muted);">None</span>';
                 
             const bonusesString = Object.entries(player.bonuses || {})
                 .filter(([_, amt]) => amt > 0)
-                .map(([res, amt]) => `<span class="inline-gem"><span class="mini-dot gem-${res}"></span> ${amt}</span>`).join(' &nbsp; ') || 'None';
+                .map(([res, amt]) => `<span class="inline-gem"><span class="mini-dot gem-${res}"></span> ${amt}</span>`).join(' ') || '<span style="color: var(--text-muted);">None</span>';
 
             let acquiredPatronsHTML = '';
             if (player.patrons && player.patrons.length > 0) {
                 const patronBadges = player.patrons.map((patron, pIdx) => {
-                    const artIndex = pIdx % 5; // Updated to support up to 5 unique patrons
+                    const artIndex = pIdx % 5;
                     return `<div class="claimed-patron-badge" style="background-image: url('malaysian_cuisine_cards/patron_${(artIndex + 1)}.jpg');" title="${patron.points} Pts"></div>`;
                 }).join(' ');
 
                 acquiredPatronsHTML = `
-                    <div style="margin-top: 6px;">
-                        <b style="color: #d4af37; text-transform: uppercase; font-size: 0.75em;">Claimed Patrons:</b><br>
-                        <div style="display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap;">${patronBadges}</div>
+                    <div style="margin-top: 5px;">
+                        <b style="color: var(--gold); text-transform: uppercase; font-size: 0.7em;">Patrons:</b>
+                        <div style="display: flex; gap: 4px; margin-top: 2px; flex-wrap: wrap;">${patronBadges}</div>
                     </div>
                 `;
-            } else {
-                acquiredPatronsHTML = `<div class="player-text" style="margin-top:6px;"><b>Patrons:</b> 0</div>`;
             }
 
             let reservedHTML = '';
@@ -355,8 +402,8 @@ export class UIRenderer {
 
             if (isUser) {
                 if (player.reservedCards && player.reservedCards.length > 0) {
-                    reservedHTML = `<div style="margin-top: 8px; border-top: 1px dashed #5a4b31; padding-top: 6px;">
-                        <div style="font-size: 0.75em; color: #d4af37; margin-bottom: 4px; font-weight: bold;">Reserved Cards (${reservedCount}/3):</div>`;
+                    reservedHTML = `<div style="margin-top: 6px; border-top: 1px dashed #5a4b31; padding-top: 5px;">
+                        <div style="font-size: 0.7em; color: var(--gold); margin-bottom: 3px; font-weight: bold;">Reserved (${reservedCount}/3):</div>`;
                     
                     player.reservedCards.forEach(card => {
                         let canAffordRes = false;
@@ -370,30 +417,36 @@ export class UIRenderer {
                         const sortedCost = this.sortCostEntries(card.cost);
                         const costStr = sortedCost.map(([res, amt]) => `<span class="inline-gem"><span class="mini-dot gem-${res}"></span> ${amt}</span>`).join(' ');
                         reservedHTML += `
-                            <div class="zoomable-reserved-card" data-card-id="${card.id}" style="background: rgba(0,0,0,0.3); padding: 4px; margin-bottom: 4px; border-radius: 4px; font-size: 0.7em; cursor: pointer; border: 1px solid rgba(212,175,55,0.3);">
-                                <b>${card.points} Pts</b> (<span class="mini-dot gem-${card.bonus}"></span>) Cost: ${costStr}<br>
-                                <button class="buy-res-btn buy-btn" data-id="${card.id}" style="margin-top: 3px; width: 100%; padding: 2px;">
+                            <div class="zoomable-reserved-card" data-card-id="${card.id}" style="background: rgba(0,0,0,0.3); padding: 4px 6px; margin-bottom: 4px; border-radius: 4px; font-size: 0.7em; cursor: pointer; border: 1px solid rgba(212,175,55,0.3);">
+                                <b>${card.points} Pts</b> (<span class="mini-dot gem-${card.bonus}"></span>) Cost: ${costStr}
+                                <button class="buy-res-btn buy-btn" data-id="${card.id}" style="margin-top: 3px; width: 100%; padding: 3px; font-size: 0.85em;">
                                     ${canAffordRes ? '🟢 Buy Reserved' : 'Buy Reserved'}
                                 </button>
                             </div>`;
                     });
                     reservedHTML += `</div>`;
                 } else {
-                    reservedHTML = `<div class="player-text" style="margin-top:6px;"><b>Reserved Cards:</b> 0/3</div>`;
+                    reservedHTML = `<div class="player-text"><b>Reserved:</b> 0/3</div>`;
                 }
             } else {
-                reservedHTML = `<div class="player-text" style="margin-top:6px;"><b>Reserved Cards:</b> ${reservedCount} hidden card(s)</div>`;
+                reservedHTML = `<div class="player-text"><b>Reserved:</b> ${reservedCount} hidden</div>`;
             }
 
-            const activeBadge = isActive ? `<span class="active-turn-badge">${isUser ? 'YOUR TURN' : 'ACTIVE'}</span>` : '';
+            const statusDot = this.gameMode === 'online' 
+                ? `<span class="${isOnline ? 'online-dot' : 'offline-dot'}" title="${isOnline ? 'Online' : 'Offline / Disconnected'}"></span>` 
+                : '';
 
             playerDiv.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #5a4b31; padding-bottom:4px; margin-bottom:8px;">
-                    <h3 style="margin: 0; color: ${isActive ? '#2ecc71' : '#e6d3a8'}; font-size: 0.95em;">${(player.name || 'Player').toUpperCase()} ${activeBadge}</h3>
-                    <span style="font-size: 0.95em; color:#e6d3a8;">(${player.prestige || 0} Pts)</span>
+                <div class="player-board-header">
+                    <div class="player-name-text">
+                        ${statusDot}
+                        <span>${(player.name || 'Player').toUpperCase()} ${isUser ? '(YOU)' : ''}</span>
+                        ${isLeader ? '👑' : ''}
+                    </div>
+                    <div class="player-prestige-badge">${player.prestige || 0} PTS</div>
                 </div>
-                <div class="player-text"><b>Tokens:</b> ${tokensString}</div>
-                <div class="player-text" style="margin-top:4px;"><b>Discounts:</b> ${bonusesString}</div>
+                <div class="player-text"><b>Tokens (${player.getTotalTokenCount ? player.getTotalTokenCount() : 0}):</b> ${tokensString}</div>
+                <div class="player-text"><b>Discounts:</b> ${bonusesString}</div>
                 ${acquiredPatronsHTML}
                 ${reservedHTML}
             `;
@@ -417,25 +470,42 @@ export class UIRenderer {
         if (!overlay) {
             overlay = document.createElement('div');
             overlay.id = 'victory-overlay';
-            Object.assign(overlay.style, {
-                position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-                backgroundColor: 'rgba(11, 28, 44, 0.92)', display: 'none',
-                justifyContent: 'center', alignItems: 'center', zIndex: 2000
-            });
+            overlay.className = 'modal-overlay';
+            overlay.style.display = 'none';
             document.body.appendChild(overlay);
         }
 
         if (this.game.isGameOver) {
             const winner = this.game.players[0];
+            const rankingsHTML = this.game.players.map((p, idx) => `
+                <tr style="border-bottom: 1px solid rgba(212,175,55,0.2);">
+                    <td style="padding: 8px; font-weight: bold; color: ${idx === 0 ? 'var(--gold)' : 'var(--text-gold)'};">#${idx + 1}</td>
+                    <td style="padding: 8px; text-align: left;">${p.name} ${idx === 0 ? '👑' : ''}</td>
+                    <td style="padding: 8px; font-weight: bold; color: var(--gold);">${p.prestige} Pts</td>
+                    <td style="padding: 8px;">${p.purchasedCards.length} cards</td>
+                </tr>
+            `).join('');
+
             overlay.innerHTML = `
-                <div style="background: #0b1c2c; padding: 40px; border-radius: 8px; text-align: center; color: #e6d3a8; border: 2px solid #d4af37; box-shadow: 0 10px 30px rgba(0,0,0,0.8);">
-                    <h1 style="color: #f1c40f; margin-top: 0; font-size: 2em; letter-spacing: 2px;">🏆 VICTORY! 🏆</h1>
-                    <p style="font-family: sans-serif; font-size: 1.2em; margin: 15px 0;">Winner: <b>${winner.name.toUpperCase()}</b></p>
-                    <div style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 6px; margin: 20px 0; font-family: sans-serif;">
-                        Final Score: <b>${winner.prestige} Points</b><br>
-                        Cards Acquired: <b>${winner.purchasedCards.length}</b>
-                    </div>
-                    <button id="restart-game-btn" class="buy-btn" style="font-size: 1.1em; padding: 10px 24px; width: auto; margin-top: 10px;">Play Again</button>
+                <div class="modal-box" style="max-width: 480px;">
+                    <h1 style="color: var(--gold); margin-top: 0; font-size: 2em; letter-spacing: 2px;">🏆 VICTORY! 🏆</h1>
+                    <p style="font-size: 1.1em; margin: 10px 0;">Champion: <b style="color: #2ecc71;">${winner.name.toUpperCase()}</b></p>
+                    
+                    <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.9em; background: rgba(0,0,0,0.3); border-radius: 6px;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid var(--panel-border); color: var(--gold);">
+                                <th style="padding: 6px;">Rank</th>
+                                <th style="padding: 6px; text-align: left;">Chef</th>
+                                <th style="padding: 6px;">Points</th>
+                                <th style="padding: 6px;">Cards</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rankingsHTML}
+                        </tbody>
+                    </table>
+
+                    <button id="restart-game-btn" class="buy-btn" style="font-size: 1em; padding: 10px 24px; width: 100%; margin-top: 10px;">Play Again</button>
                 </div>
             `;
             overlay.style.display = 'flex';
@@ -454,11 +524,8 @@ export class UIRenderer {
         if (!overlay) {
             overlay = document.createElement('div');
             overlay.id = 'discard-overlay';
-            Object.assign(overlay.style, {
-                position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-                backgroundColor: 'rgba(11, 28, 44, 0.9)', display: 'none',
-                justifyContent: 'center', alignItems: 'center', zIndex: 1000
-            });
+            overlay.className = 'modal-overlay';
+            overlay.style.display = 'none';
             document.body.appendChild(overlay);
         }
         
@@ -473,16 +540,16 @@ export class UIRenderer {
         let dropdownsHTML = '';
         for(let i = 0; i < excess; i++) {
             let options = Object.entries(player.tokens || {}).filter(([_, amt]) => amt > 0).map(([res, amt]) => `<option value="${res}">${res.charAt(0).toUpperCase() + res.slice(1)}</option>`).join('');
-            dropdownsHTML += `<select class="discard-select" style="margin: 5px; padding: 8px; font-family: sans-serif;">${options}</select><br>`;
+            dropdownsHTML += `<select class="discard-select" style="margin: 5px; padding: 8px; font-family: inherit; border-radius: 4px; border: 1px solid var(--panel-border); background: #040d16; color: var(--text-gold);">${options}</select><br>`;
         }
 
         overlay.innerHTML = `
-            <div style="background: #0b1c2c; padding: 30px; border-radius: 4px; text-align: center; color: #e6d3a8; border: 1px solid #d4af37;">
-                <h2 style="color: #e74c3c; margin-top: 0;">Limit Exceeded</h2>
-                <p style="font-family: sans-serif;">You have <b>${player.getTotalTokenCount ? player.getTotalTokenCount() : 0}</b> tokens. You must discard <b>${excess}</b>.</p>
-                <div style="background: rgba(0,0,0,0.3); padding: 10px; margin: 15px 0; font-family: sans-serif; font-size: 0.9em;">${tokenCounts}</div>
+            <div class="modal-box" style="max-width: 420px;">
+                <h2 style="color: #e74c3c; margin-top: 0;">Token Limit Exceeded</h2>
+                <p style="font-size: 0.9em;">You hold <b>${player.getTotalTokenCount ? player.getTotalTokenCount() : 0}</b> tokens (maximum 10). You must discard <b>${excess}</b> token(s):</p>
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; margin: 15px 0; border-radius: 6px;">${tokenCounts}</div>
                 ${dropdownsHTML}
-                <button id="confirm-discard-btn" class="buy-btn" style="margin-top: 20px; font-size: 1em; padding: 8px 16px; width: auto;">Discard Tokens</button>
+                <button id="confirm-discard-btn" class="buy-btn" style="margin-top: 15px; font-size: 0.95em; padding: 8px 20px; width: 100%;">Discard Selected Tokens</button>
             </div>
         `;
         overlay.style.display = 'flex';
