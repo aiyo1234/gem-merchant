@@ -1,44 +1,29 @@
 import { RuleEngine } from './RuleEngine.js';
 import { RESOURCES, RULES } from './constants.js';
-import { DeepNeuralNetwork } from './DeepNeuralNetwork.js';
-import { MCTSEngine } from './MCTSEngine.js';
-import { MCTS_DNN_WEIGHTS } from './mcts_weights_data.js';
 
 export class GrandmasterAI {
-    // 90-Minute 8-Core Evolutionary Supreme Champion Genome (1,612,800 Matches Evaluated)
-    static DEFAULT_WEIGHTS = {
-        pointWeight: 455.0,
-        cardPointWeight: 185.0,
-        patronRewardWeight: 347.75,
-        focusSynergyWeight: 115.0,
-        tokenCostPenalty: 15.0,
-        freeCardWeight: 61.22,
-        denialSensitivity: 10.31,
-        tokenFlushThreshold: 8
-    };
-
     /**
-     * Compute best action using 90-Minute 8-Core Supreme Champion Algorithm
+     * MASTERCLASS GRANDMASTER ENGINE (v10.0)
+     * Executes the 3 Primary Winning Archetypes with Strict Turn Economy:
+     * 1. Tier 3 "Rush" Strategy (~21-24 turns: 4-5 pt cards, Gold wildcards, 0-point bypass)
+     * 2. Noble Hybrid Strategy (Targeted 8-10 card engine for 2+ Nobles + Tier 2 cards)
+     * 3. Defensive Hate-Drafting & Stack-Dropping Token Denial
      */
     static computeBestAction(game, aiPlayer) {
         try {
-            return this.computeBestActionWithWeights(game, aiPlayer, this.DEFAULT_WEIGHTS);
+            return this.computeMasterclassAction(game, aiPlayer);
         } catch (e) {
             return { type: 'PASS' };
         }
     }
 
-    /**
-     * Compute action using customizable weight genome for self-play training & evolution
-     * @param {GameState} game 
-     * @param {Player} aiPlayer 
-     * @param {Object} w Custom weights
-     * @returns {Object} Action descriptor
-     */
-    static computeBestActionWithWeights(game, aiPlayer, w = this.DEFAULT_WEIGHTS) {
+    static computeBestActionWithWeights(game, aiPlayer, w) {
+        return this.computeMasterclassAction(game, aiPlayer);
+    }
+
+    static computeMasterclassAction(game, aiPlayer) {
         if (!game || !aiPlayer || game.isGameOver) return { type: 'PASS' };
 
-        const weights = { ...this.DEFAULT_WEIGHTS, ...w };
         const bank = game.bank.tokens;
         const patrons = game.availablePatrons || [];
         const opponents = game.players.filter(p => p !== aiPlayer);
@@ -46,14 +31,36 @@ export class GrandmasterAI {
         const bankHasGold = (bank[RESOURCES.GOLD] || 0) > 0;
 
         // ==============================================================
-        // 1. OPPONENT THREAT MODELING & ACTIVE DENIAL (Hate-Drafting)
+        // 1. SETUP & BOARD EVALUATION (TURN 1 ASSESSMENT)
         // ==============================================================
-        let criticalDenialCard = null;
+        // A. Noble Synergies: Count overlapping color requirements across Nobles
+        const nobleColorCounts = { ruby: 0, sapphire: 0, emerald: 0, onyx: 0, pearl: 0 };
+        patrons.forEach(p => {
+            Object.keys(p.requirements || {}).forEach(r => nobleColorCounts[r] = (nobleColorCounts[r] || 0) + 1);
+        });
+        const nobleRanked = Object.entries(nobleColorCounts).sort((a, b) => b[1] - a[1]);
+        const hasNobleSynergy = (nobleRanked[0] && nobleRanked[0][1] >= 2 && nobleRanked[1] && nobleRanked[1][1] >= 2);
+        const nobleFocus1 = nobleRanked[0] ? nobleRanked[0][0] : 'sapphire';
+        const nobleFocus2 = nobleRanked[1] ? nobleRanked[1][0] : 'emerald';
+
+        // B. Tier 3 Rush Assessment: Look for clean mono/dual-cost 4-5 pt cards (e.g. 7 White or 7 Red + 3 Green)
+        const visibleT3 = game.visibleMarket[3] || [];
+        const monoT3Cards = visibleT3.filter(c => {
+            const costs = Object.values(c.cost || {});
+            return costs.some(amt => amt >= 7) || (c.points >= 4 && costs.length <= 2);
+        });
+
+        // Archetype Decision: Tier 3 Rush vs Noble Hybrid
+        const isTier3Rush = (monoT3Cards.length >= 1 || !hasNobleSynergy);
+
+        // ==============================================================
+        // 2. DEFENSIVE HATE-DRAFTING & OPPONENT STARVATION (CUTTHROAT 2P)
+        // ==============================================================
+        let urgentDenialCard = null;
         for (const opp of opponents) {
             const oppPrestige = opp.prestige || 0;
-            for (let tier = 1; tier <= 3; tier++) {
-                const market = game.visibleMarket[tier] || [];
-                for (const card of market) {
+            for (let tier = 2; tier <= 3; tier++) {
+                for (const card of (game.visibleMarket[tier] || [])) {
                     try {
                         RuleEngine.calculateActualCost(opp, card.cost);
                         const simBonuses = { ...opp.bonuses, [card.bonus]: (opp.bonuses[card.bonus] || 0) + 1 };
@@ -63,49 +70,28 @@ export class GrandmasterAI {
                                 extraPatronPts += p.points;
                             }
                         });
-                        const projectedPrestige = oppPrestige + card.points + extraPatronPts;
-                        if (projectedPrestige >= RULES.VICTORY_THRESHOLD) {
-                            criticalDenialCard = { card, tier, priority: 100 };
+
+                        const projected = oppPrestige + card.points + extraPatronPts;
+                        if (projected >= RULES.VICTORY_THRESHOLD) {
+                            urgentDenialCard = { card, tier, priority: 100 };
                             break;
+                        } else if (card.points >= 4 && oppPrestige >= 8) {
+                            urgentDenialCard = { card, tier, priority: 60 };
                         }
                     } catch (e) {}
                 }
-                if (criticalDenialCard && criticalDenialCard.priority === 100) break;
+                if (urgentDenialCard && urgentDenialCard.priority === 100) break;
             }
-            if (criticalDenialCard && criticalDenialCard.priority === 100) break;
+            if (urgentDenialCard && urgentDenialCard.priority === 100) break;
         }
 
-        // Emergency Denial: Save the game if opponent is about to win next turn
-        if (criticalDenialCard && criticalDenialCard.priority === 100 && canReserve) {
-            return {
-                type: 'RESERVE_CARD',
-                tier: criticalDenialCard.tier,
-                cardId: criticalDenialCard.card.id
-            };
+        // Emergency Hate-Draft: Block opponent from winning next turn
+        if (urgentDenialCard && urgentDenialCard.priority === 100 && canReserve) {
+            return { type: 'RESERVE_CARD', tier: urgentDenialCard.tier, cardId: urgentDenialCard.card.id };
         }
 
         // ==============================================================
-        // 2. ORTHOGONAL LANE MODELING & PATRON PATHFINDING
-        // ==============================================================
-        const oppPressure = { ruby: 0, sapphire: 0, emerald: 0, onyx: 0, pearl: 0 };
-        opponents.forEach(opp => {
-            for (const [r, count] of Object.entries(opp.tokens || {})) oppPressure[r] = (oppPressure[r] || 0) + count;
-            for (const [r, count] of Object.entries(opp.bonuses || {})) oppPressure[r] = (oppPressure[r] || 0) + count * 2;
-        });
-
-        const laneScores = {};
-        ['ruby', 'sapphire', 'emerald', 'pearl', 'onyx'].forEach(res => {
-            const bankCount = bank[res] || 0;
-            const myBonus = aiPlayer.bonuses[res] || 0;
-            const pressure = oppPressure[res] || 0;
-            laneScores[res] = (bankCount * 2.0) + (myBonus * 6.0) - (pressure * (weights.denialSensitivity || 10.3));
-        });
-        const sortedLanes = Object.entries(laneScores).sort((a, b) => b[1] - a[1]);
-        const bestColor1 = sortedLanes[0] ? sortedLanes[0][0] : 'ruby';
-        const bestColor2 = sortedLanes[1] ? sortedLanes[1][0] : 'sapphire';
-
-        // ==============================================================
-        // 3. GATHER ALL VISIBLE & RESERVED CARDS
+        // 3. GATHER & EVALUATE ALL PURCHASABLE CARDS (STRICT TURN ECONOMY)
         // ==============================================================
         const allCards = [];
         for (let t = 3; t >= 1; t--) {
@@ -113,9 +99,6 @@ export class GrandmasterAI {
         }
         (aiPlayer.reservedCards || []).forEach(card => allCards.push({ card, tier: card.tier, isReserved: true }));
 
-        // ==============================================================
-        // 4. EVALUATE AFFORDABLE PURCHASES (HIGH PRESTIGE FIRST)
-        // ==============================================================
         const affordable = [];
         for (const item of allCards) {
             try {
@@ -130,29 +113,28 @@ export class GrandmasterAI {
                 });
 
                 const totalPoints = item.card.points + patronReward;
-                const wins = (aiPlayer.prestige + totalPoints) >= 15;
+                const wins = (aiPlayer.prestige + totalPoints) >= RULES.VICTORY_THRESHOLD;
 
                 let netTokens = 0;
                 for (const [r, amt] of Object.entries(item.card.cost)) {
                     netTokens += Math.max(0, amt - (aiPlayer.bonuses[r] || 0));
                 }
 
-                const matchesFocus = (item.card.bonus === bestColor1 || item.card.bonus === bestColor2) ? 1 : 0;
+                // Spot Tier-1 Trap Cards: costs 4-5 gems for 0 points with 0 noble alignment
+                const isNobleAligned = (item.card.bonus === nobleFocus1 || item.card.bonus === nobleFocus2);
+                const isTrapCard = (item.tier === 1 && totalPoints === 0 && netTokens >= 4 && !isNobleAligned);
+                if (isTrapCard) continue; // Purge trap cards
 
-                let score = (totalPoints * (weights.pointWeight || 455.0))
-                    + (item.card.points * (weights.cardPointWeight || 185.0))
-                    + (patronReward * (weights.patronRewardWeight || 347.75))
-                    + (matchesFocus * (weights.focusSynergyWeight || 115.0))
-                    - (netTokens * (weights.tokenCostPenalty || 15.0))
-                    + (item.tier * 12.0);
-
-                if (netTokens === 0) score += (weights.freeCardWeight || 61.22);
+                // Turn Economy Scoring: High Points / Fewest Turns
+                let score = (totalPoints * 600.0) + (item.card.points * 250.0) + (patronReward * 450.0) - (netTokens * 18.0) + (item.tier * 15.0);
+                if (isNobleAligned) score += 90.0;
+                if (netTokens === 0) score += 70.0;
 
                 affordable.push({ ...item, totalPoints, patronReward, netTokens, wins, score });
             } catch (e) {}
         }
 
-        // TACTIC 1: IMMEDIATE WINNING PURCHASE (15+ Points)
+        // TACTIC 1: IMMEDIATE VICTORY PURCHASE (15+ Points)
         const winBuy = affordable.find(a => a.wins);
         if (winBuy) {
             return winBuy.isReserved ? { type: 'BUY_RESERVED', cardId: winBuy.card.id } : { type: 'BUY_CARD', tier: winBuy.tier, cardId: winBuy.card.id };
@@ -166,7 +148,7 @@ export class GrandmasterAI {
             return top.isReserved ? { type: 'BUY_RESERVED', cardId: top.card.id } : { type: 'BUY_CARD', tier: top.tier, cardId: top.card.id };
         }
 
-        // TACTIC 3: BUY 1-POINT CARDS
+        // TACTIC 3: BUY 1-POINT CARDS (PACE ADVANCEMENT)
         const oneBuys = affordable.filter(a => a.totalPoints >= 1);
         if (oneBuys.length > 0) {
             oneBuys.sort((a, b) => b.score - a.score);
@@ -174,31 +156,33 @@ export class GrandmasterAI {
             return top.isReserved ? { type: 'BUY_RESERVED', cardId: top.card.id } : { type: 'BUY_CARD', tier: top.tier, cardId: top.card.id };
         }
 
-        // TACTIC 4: ZERO-COST FREE PURCHASES
-        const freeBuys = affordable.filter(a => a.netTokens === 0 && (a.card.bonus === bestColor1 || a.card.bonus === bestColor2 || a.patronReward > 0));
+        // TACTIC 4: ZERO-COST FREE PURCHASES (IF SYNERGISTIC)
+        const freeBuys = affordable.filter(a => a.netTokens === 0 && (a.totalPoints > 0 || a.card.bonus === nobleFocus1 || a.card.bonus === nobleFocus2));
         if (freeBuys.length > 0) {
             freeBuys.sort((a, b) => b.score - a.score);
             const top = freeBuys[0];
             return top.isReserved ? { type: 'BUY_RESERVED', cardId: top.card.id } : { type: 'BUY_CARD', tier: top.tier, cardId: top.card.id };
         }
 
-        // TACTIC 5: CHEAP ENGINE BUILDING (ONLY EARLY GAME < 4 DISCOUNTS)
-        const cheapFocus = affordable.filter(a => a.tier === 1 && a.netTokens <= 2 && (a.card.bonus === bestColor1 || a.card.bonus === bestColor2) && (aiPlayer.bonuses[a.card.bonus] || 0) < 4);
-        if (cheapFocus.length > 0 && aiPlayer.prestige < 4) {
-            cheapFocus.sort((a, b) => b.score - a.score);
-            const top = cheapFocus[0];
-            return top.isReserved ? { type: 'BUY_RESERVED', cardId: top.card.id } : { type: 'BUY_CARD', tier: top.tier, cardId: top.card.id };
+        // TACTIC 5: NOBLE HYBRID ENGINE BUILDING (ONLY IF NOBLE HYBRID AND < 4 TIER-1 DISCOUNTS)
+        if (!isTier3Rush && aiPlayer.purchasedCards.length < 4 && aiPlayer.prestige < 3) {
+            const cheapNobleCards = affordable.filter(a => a.tier === 1 && a.netTokens <= 2 && (a.card.bonus === nobleFocus1 || a.card.bonus === nobleFocus2));
+            if (cheapNobleCards.length > 0) {
+                cheapNobleCards.sort((a, b) => b.score - a.score);
+                const top = cheapNobleCards[0];
+                return top.isReserved ? { type: 'BUY_RESERVED', cardId: top.card.id } : { type: 'BUY_CARD', tier: top.tier, cardId: top.card.id };
+            }
         }
 
         // TACTIC 6: ANTI-STALL TOKEN FLUSH (HOLDING 8+ TOKENS)
-        if (affordable.length > 0 && aiPlayer.getTotalTokenCount() >= (weights.tokenFlushThreshold || 8)) {
+        if (affordable.length > 0 && aiPlayer.getTotalTokenCount() >= 8) {
             affordable.sort((a, b) => b.score - a.score);
             const top = affordable[0];
             return top.isReserved ? { type: 'BUY_RESERVED', cardId: top.card.id } : { type: 'BUY_CARD', tier: top.tier, cardId: top.card.id };
         }
 
         // ==============================================================
-        // 5. TARGET SELECTION (PRIORITIZE HIGH-TIER SPRINT)
+        // 4. STRATEGIC TARGET SELECTION & GOLD WILDCARD SPRINT
         // ==============================================================
         let target = null;
         if (aiPlayer.reservedCards && aiPlayer.reservedCards.length > 0) {
@@ -207,23 +191,32 @@ export class GrandmasterAI {
         }
 
         if (!target) {
-            const visibleT3 = (game.visibleMarket[3] || []).filter(c => c.points >= 4);
-            const focusT3 = visibleT3.filter(c => (c.cost[bestColor1] || 0) >= 3 || (c.cost[bestColor2] || 0) >= 3);
-            if (focusT3.length > 0) target = { card: focusT3[0], tier: 3, isReserved: false };
-            else if (visibleT3.length > 0) target = { card: visibleT3[0], tier: 3, isReserved: false };
-            else {
-                const visibleT2 = (game.visibleMarket[2] || []).filter(c => c.points >= 2);
-                if (visibleT2.length > 0) target = { card: visibleT2[0], tier: 2, isReserved: false };
+            // If Tier 3 Rush: Target best mono/clean-cost 4-5 pt card
+            if (isTier3Rush && monoT3Cards.length > 0) {
+                monoT3Cards.sort((a, b) => b.points - a.points);
+                target = { card: monoT3Cards[0], tier: 3, isReserved: false };
+            } else {
+                const visibleT3All = (game.visibleMarket[3] || []).filter(c => c.points >= 4);
+                if (visibleT3All.length > 0) target = { card: visibleT3All[0], tier: 3, isReserved: false };
+                else {
+                    const visibleT2 = (game.visibleMarket[2] || []).filter(c => c.points >= 2);
+                    if (visibleT2.length > 0) target = { card: visibleT2[0], tier: 2, isReserved: false };
+                }
             }
         }
 
-        // STRATEGIC GOLD WILDCARD RESERVATION (LOCK 4+ PT CARDS & GRAB GOLD)
-        if (target && !target.isReserved && target.card.points >= 4 && canReserve && bankHasGold && aiPlayer.purchasedCards.length >= 1) {
+        // Strategic Gold Wildcard Reservation (Lock 4+ Point Card & Capture Gold)
+        if (target && !target.isReserved && target.card.points >= 4 && canReserve && bankHasGold && (aiPlayer.reservedCards || []).length < 2) {
             return { type: 'RESERVE_CARD', tier: target.tier, cardId: target.card.id };
         }
 
+        // Defensive Hate-Draft Reserving
+        if (urgentDenialCard && urgentDenialCard.priority >= 60 && canReserve && bankHasGold && (aiPlayer.reservedCards || []).length < 2) {
+            return { type: 'RESERVE_CARD', tier: urgentDenialCard.tier, cardId: urgentDenialCard.card.id };
+        }
+
         // ==============================================================
-        // 6. TOKEN DEFICIT OPTIMIZATION (MAX 3-TOKEN DIVERSE INFLOW)
+        // 5. TOKEN DEFICIT OPTIMIZATION & STACK-DROPPING DENIAL
         // ==============================================================
         const deficits = {};
         if (target) {
@@ -233,7 +226,7 @@ export class GrandmasterAI {
                 if (have < need) deficits[r] = need - have;
             }
 
-            // Take 2 if deficit >= 2 and bank >= 4
+            // Take 2 of same color if deficit >= 2 and bank >= 4
             for (const [r, count] of Object.entries(deficits)) {
                 if ((bank[r] || 0) >= 4 && count >= 2 && aiPlayer.getTotalTokenCount() <= 8) {
                     return { type: 'TAKE_TWO', resource: r };
@@ -241,24 +234,45 @@ export class GrandmasterAI {
             }
         }
 
-        if ((aiPlayer.bonuses[bestColor1] || 0) < 4) deficits[bestColor1] = (deficits[bestColor1] || 0) + 3;
-        if ((aiPlayer.bonuses[bestColor2] || 0) < 4) deficits[bestColor2] = (deficits[bestColor2] || 0) + 2;
+        if (!isTier3Rush) {
+            if ((aiPlayer.bonuses[nobleFocus1] || 0) < 4) deficits[nobleFocus1] = (deficits[nobleFocus1] || 0) + 3;
+            if ((aiPlayer.bonuses[nobleFocus2] || 0) < 4) deficits[nobleFocus2] = (deficits[nobleFocus2] || 0) + 2;
+        }
+
+        // STACK-DROPPING DENIAL: If opponent needs a color and bank has 4, taking it drops bank to 3!
+        const oppNeeds = {};
+        opponents.forEach(opp => {
+            for (let t = 2; t <= 3; t++) {
+                (game.visibleMarket[t] || []).forEach(c => {
+                    if (c.points >= 2) {
+                        for (const [r] of Object.entries(c.cost || {})) {
+                            if ((bank[r] || 0) === 4) oppNeeds[r] = (oppNeeds[r] || 0) + 40;
+                        }
+                    }
+                });
+            }
+        });
+
+        const combinedNeeds = {};
+        for (const [r, count] of Object.entries(deficits)) combinedNeeds[r] = (combinedNeeds[r] || 0) + (count * 100);
+        for (const [r, count] of Object.entries(oppNeeds)) combinedNeeds[r] = (combinedNeeds[r] || 0) + count;
 
         const availableColors = Object.entries(bank)
             .filter(([res, count]) => res !== 'gold' && count > 0)
             .map(([res]) => res);
 
-        const ranked = availableColors.sort((a, b) => (deficits[b] || 0) - (deficits[a] || 0));
+        const ranked = availableColors.sort((a, b) => (combinedNeeds[b] || 0) - (combinedNeeds[a] || 0));
 
         const curTokens = aiPlayer.getTotalTokenCount();
-        if (ranked.length > 0 && curTokens < 10) {
-            const takeN = Math.min(3, Math.min(10 - curTokens, ranked.length));
+        if (ranked.length > 0 && curTokens < RULES.MAX_PLAYER_TOKENS) {
+            const space = RULES.MAX_PLAYER_TOKENS - curTokens;
+            const takeN = Math.min(3, Math.min(space, ranked.length));
             if (takeN > 0) return { type: 'TAKE_DIFFERENT', tokens: ranked.slice(0, takeN) };
         }
 
-        if (canReserve && bankHasGold) {
-            const visibleT3 = game.visibleMarket[3] || [];
-            if (visibleT3.length > 0) return { type: 'RESERVE_CARD', tier: 3, cardId: visibleT3[0].id };
+        if (canReserve && bankHasGold && (aiPlayer.reservedCards || []).length < 2) {
+            const visibleT3All = game.visibleMarket[3] || [];
+            if (visibleT3All.length > 0) return { type: 'RESERVE_CARD', tier: 3, cardId: visibleT3All[0].id };
         }
 
         if (affordable.length > 0) {
