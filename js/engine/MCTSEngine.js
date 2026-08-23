@@ -65,11 +65,13 @@ export class MCTSEngine {
             // 2. SIMULATE / EVALUATE child action with Heuristic + Value Head
             let sampleValue = dnnOutput.value;
 
-            // Direct game-winning purchase bonus
+            // Direct prestige point rewards
             if (bestChild.action.type === 'BUY_CARD' || bestChild.action.type === 'BUY_RESERVED') {
-                sampleValue += 0.4;
+                const pts = bestChild.action.card ? bestChild.action.card.points : 0;
+                sampleValue += (pts * 0.6) + (bestChild.action.tier === 3 ? 0.8 : (bestChild.action.tier === 2 ? 0.3 : -0.1));
             } else if (bestChild.action.type === 'RESERVE_CARD') {
-                sampleValue += 0.2;
+                const pts = bestChild.action.card ? bestChild.action.card.points : 0;
+                if (pts >= 3) sampleValue += 0.7;
             }
 
             // 3. BACKPROPAGATE
@@ -90,11 +92,21 @@ export class MCTSEngine {
         const actions = [];
         const patrons = game.availablePatrons || [];
 
-        // 1. Affordable visible cards
+        // 1. Affordable visible cards (Never waste gold on 0-point cards)
         for (let tier = 1; tier <= 3; tier++) {
             (game.visibleMarket[tier] || []).forEach(card => {
                 try {
                     RuleEngine.calculateActualCost(player, card.cost);
+                    
+                    let goldNeeded = 0;
+                    for (const [res, amt] of Object.entries(card.cost)) {
+                        const discount = player.bonuses[res] || 0;
+                        const rem = Math.max(0, amt - discount);
+                        const have = player.tokens[res] || 0;
+                        if (have < rem) goldNeeded += (rem - have);
+                    }
+                    if (card.points === 0 && goldNeeded > 0) return; // Do not waste gold
+
                     actions.push({ type: 'BUY_CARD', tier, cardId: card.id, card });
                 } catch (e) {}
             });
