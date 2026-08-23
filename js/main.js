@@ -616,16 +616,22 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Preload all game card & patron images in the background for instant rendering
+// Preload modern minimalist boardgame assets in background for instant rendering
 function preloadGameAssets() {
-    for (let i = 1; i <= 45; i++) {
+    const assets = [
+        'assets/art/tier1_card.jpg',
+        'assets/art/tier2_card.jpg',
+        'assets/art/tier3_card.jpg',
+        'assets/art/patron_1.jpg',
+        'assets/art/patron_2.jpg',
+        'assets/art/patron_3.jpg',
+        'assets/art/patron_4.jpg',
+        'assets/art/patron_5.jpg'
+    ];
+    assets.forEach(src => {
         const img = new Image();
-        img.src = `malaysian_cuisine_cards/card_t1_${i}.png`;
-    }
-    for (let i = 1; i <= 5; i++) {
-        const pImg = new Image();
-        pImg.src = `malaysian_cuisine_cards/patron_${i}.jpg`;
-    }
+        img.src = src;
+    });
 }
 
 if (document.readyState === 'complete') {

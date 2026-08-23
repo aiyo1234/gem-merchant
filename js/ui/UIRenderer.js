@@ -56,14 +56,13 @@ export class UIRenderer {
     }
 
     getCardArtPath(card) {
-        const photoIndex = card.artIndex || 1;
-        return `malaysian_cuisine_cards/card_t1_${photoIndex}.png`;
+        const tier = card && card.tier ? card.tier : 1;
+        return `assets/art/tier${tier}_card.jpg`;
     }
 
     getPatronArtPath(index) {
-        const totalPatronPhotos = 5;
-        const patronIndex = (index % totalPatronPhotos) + 1;
-        return `malaysian_cuisine_cards/patron_${patronIndex}.jpg`;
+        const patronIndex = (index % 5) + 1;
+        return `assets/art/patron_${patronIndex}.jpg`;
     }
 
     sortCostEntries(costObj) {
@@ -386,7 +385,7 @@ export class UIRenderer {
             if (player.patrons && player.patrons.length > 0) {
                 const patronBadges = player.patrons.map((patron, pIdx) => {
                     const artIndex = pIdx % 5;
-                    return `<div class="claimed-patron-badge" style="background-image: url('malaysian_cuisine_cards/patron_${(artIndex + 1)}.jpg');" title="${patron.points} Pts"></div>`;
+                    return `<div class="claimed-patron-badge" style="background-image: url('assets/art/patron_${(artIndex + 1)}.jpg');" title="${patron.points} Pts"></div>`;
                 }).join(' ');
 
                 acquiredPatronsHTML = `
