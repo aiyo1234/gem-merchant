@@ -476,6 +476,26 @@ export class UIRenderer {
 
         if (this.game.isGameOver) {
             const winner = this.game.players[0];
+            const isWinnerLocal = this.isPlayerLocal(winner);
+            const isPassAndPlay = this.gameMode === 'pass_and_play';
+
+            let titleHTML = '';
+            let subtitleHTML = '';
+            let boxBorderColor = 'var(--panel-border)';
+
+            if (isPassAndPlay) {
+                titleHTML = `<h1 style="color: var(--gold); margin-top: 0; font-size: 2em; letter-spacing: 2px;">🏆 MATCH COMPLETE! 🏆</h1>`;
+                subtitleHTML = `<p style="font-size: 1.1em; margin: 10px 0;">Champion: <b style="color: #2ecc71;">${winner.name.toUpperCase()}</b></p>`;
+            } else if (isWinnerLocal) {
+                titleHTML = `<h1 style="color: #2ecc71; margin-top: 0; font-size: 2em; letter-spacing: 2px;">🏆 VICTORY! 🏆</h1>`;
+                subtitleHTML = `<p style="font-size: 1.1em; margin: 10px 0; color: var(--gold);">Congratulations! You are the Grand Gem Master!</p>`;
+                boxBorderColor = '#2ecc71';
+            } else {
+                titleHTML = `<h1 style="color: #e74c3c; margin-top: 0; font-size: 2em; letter-spacing: 2px;">💀 DEFEATED</h1>`;
+                subtitleHTML = `<p style="font-size: 1.1em; margin: 10px 0;">Winner: <b style="color: var(--gold);">${winner.name.toUpperCase()}</b> (Better luck next trade!)</p>`;
+                boxBorderColor = '#e74c3c';
+            }
+
             const rankingsHTML = this.game.players.map((p, idx) => `
                 <tr style="border-bottom: 1px solid rgba(212,175,55,0.2);">
                     <td style="padding: 8px; font-weight: bold; color: ${idx === 0 ? 'var(--gold)' : 'var(--text-gold)'};">#${idx + 1}</td>
@@ -486,9 +506,9 @@ export class UIRenderer {
             `).join('');
 
             overlay.innerHTML = `
-                <div class="modal-box" style="max-width: 480px;">
-                    <h1 style="color: var(--gold); margin-top: 0; font-size: 2em; letter-spacing: 2px;">🏆 VICTORY! 🏆</h1>
-                    <p style="font-size: 1.1em; margin: 10px 0;">Champion: <b style="color: #2ecc71;">${winner.name.toUpperCase()}</b></p>
+                <div class="modal-box" style="max-width: 480px; border-color: ${boxBorderColor};">
+                    ${titleHTML}
+                    ${subtitleHTML}
                     
                     <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.9em; background: rgba(0,0,0,0.3); border-radius: 6px;">
                         <thead>
