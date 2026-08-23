@@ -6,8 +6,15 @@ const path = require('path');
 
 const app = express();
 app.use(cors());
-// Serve static client assets
-app.use(express.static(path.join(__dirname)));
+// Serve static client assets with aggressive caching headers for instant image loading
+app.use(express.static(path.join(__dirname), {
+    maxAge: '7d',
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.png') || filePath.endsWith('.jpg') || filePath.endsWith('.mp3')) {
+            res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+        }
+    }
+}));
 
 const server = http.createServer(app);
 
