@@ -34,8 +34,16 @@ export class GameState {
         this.isAiPlaying = false;
     }
 
-    initializeGame(playerNames, isVsAi = false) {
-        this.players = playerNames.map(name => new Player(name));
+    initializeGame(playerNames, isVsAi = false, shufflePlayers = true) {
+        let names = [...playerNames];
+        if (shufflePlayers) {
+            // Fisher-Yates shuffle to randomize starting player and turn order
+            for (let i = names.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [names[i], names[j]] = [names[j], names[i]];
+            }
+        }
+        this.players = names.map(name => new Player(name));
         this.isVsAi = isVsAi;
         this.bank.initialize(this.players.length);
         this.currentPlayerIndex = 0;
@@ -329,13 +337,17 @@ export class GameState {
     }
 
     checkAndTriggerAiIfNeeded() {
-        if (this.isVsAi && !this.isGameOver && this.currentPlayerIndex !== 0) {
-            this.triggerAiTurn();
+        if (this.isVsAi && !this.isGameOver) {
+            const cur = this.getCurrentPlayer();
+            if (cur && cur.isBot) {
+                this.triggerAiTurn();
+            }
         }
     }
 
     triggerAiTurn() {
-        if (this.isAiPlaying || this.isGameOver || this.currentPlayerIndex === 0) return;
+        const ai = this.getCurrentPlayer();
+        if (this.isAiPlaying || this.isGameOver || !ai || !ai.isBot) return;
         this.isAiPlaying = true;
 
         setTimeout(() => {

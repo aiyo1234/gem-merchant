@@ -78,7 +78,8 @@ function amIHost() {
 function canLocalPlayerAct() {
     if (game.isGameOver) return false;
     if (currentGameMode === 'solo') {
-        return game.currentPlayerIndex === 0;
+        const currentPlayer = game.getCurrentPlayer();
+        return currentPlayer && !currentPlayer.isBot;
     }
     if (currentGameMode === 'pass_and_play') {
         return true;
@@ -279,7 +280,8 @@ socket.on('game_started', (initialState) => {
     });
 
     ui.renderAll();
-    ui.showToast(`🚀 The game has begun! Good luck merchants!`);
+    const firstPlayer = game.getCurrentPlayer();
+    ui.showToast(`🎲 Turn order randomized! <b>${firstPlayer ? firstPlayer.name : 'First player'}</b> takes the first turn!`);
     checkAndTriggerOnlineBotIfNeeded();
 });
 
@@ -457,9 +459,11 @@ document.addEventListener('click', (e) => {
         for (let i = 1; i < chosenPlayerCount; i++) {
             names.push(`Bot ${i}`);
         }
-        game.initializeGame(names, true);
+        game.initializeGame(names, true, true);
         ui.renderAll();
-        ui.showToast("🤖 Solo game started against AI Bots. Your turn!");
+        const firstPlayer = game.getCurrentPlayer();
+        const isYouFirst = firstPlayer && firstPlayer.name === 'You';
+        ui.showToast(`🎲 Turn order randomized! <b>${firstPlayer.name}</b> goes first! ${isYouFirst ? '(Your turn)' : "(Bot's turn)"}`);
         return;
     }
 
@@ -477,9 +481,10 @@ document.addEventListener('click', (e) => {
         for (let i = 1; i <= chosenPlayerCount; i++) {
             names.push(`Merchant ${i}`);
         }
-        game.initializeGame(names, false);
+        game.initializeGame(names, false, true);
         ui.renderAll();
-        ui.showToast("👥 Pass & Play game started! Pass the screen on each turn.");
+        const firstPlayer = game.getCurrentPlayer();
+        ui.showToast(`🎲 Turn order randomized! <b>${firstPlayer.name}</b> takes the first turn!`);
         return;
     }
 
@@ -567,10 +572,17 @@ document.addEventListener('click', (e) => {
             return;
         }
 
-        const playerNames = currentRoomPlayers.map(p => p.name);
-        game.initializeGame(playerNames, false);
+        // Randomly shuffle players order for online match
+        const shuffledRoomPlayers = [...currentRoomPlayers];
+        for (let i = shuffledRoomPlayers.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledRoomPlayers[i], shuffledRoomPlayers[j]] = [shuffledRoomPlayers[j], shuffledRoomPlayers[i]];
+        }
 
-        currentRoomPlayers.forEach((rp, idx) => {
+        const playerNames = shuffledRoomPlayers.map(p => p.name);
+        game.initializeGame(playerNames, false, false); // already shuffled
+
+        shuffledRoomPlayers.forEach((rp, idx) => {
             if (rp.isBot && game.players[idx]) {
                 game.players[idx].isBot = true;
             }
