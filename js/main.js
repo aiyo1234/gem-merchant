@@ -133,7 +133,7 @@ socket.on('update_room', (roomData) => {
                         ${p.name} ${isMe ? '(You)' : ''}
                     </span>
                     <span style="font-size: 0.75em; color: ${isHost ? 'var(--gold)' : 'var(--text-muted)'}; text-transform: uppercase; font-weight: bold;">
-                        ${isHost ? '👑 Host' : (isOnline ? 'Player' : 'Offline')}
+                        ${isHost ? '👑 Host' : (isOnline ? 'Merchant' : 'Offline')}
                     </span>
                 </li>
             `;
@@ -184,7 +184,7 @@ socket.on('game_started', (initialState) => {
 
     game.loadInitialState(initialState);
     ui.renderAll();
-    ui.showToast(`🚀 The game has begun! Good luck chefs!`);
+    ui.showToast(`🚀 The game has begun! Good luck merchants!`);
 });
 
 // Reconnection Live State Sync (Resumes game right where it left off)
@@ -223,8 +223,6 @@ socket.on('sync_game_state', ({ actionData, fullState }) => {
                 game.purchaseReservedCard(actionData.cardId);
             } else if (actionData.type === 'DISCARD_TOKENS') {
                 game.discardTokens(actionData.tokens);
-            } else if (actionData.type === 'EMOTE') {
-                ui.showToast(`💬 <b>${actionData.senderName}</b>: ${actionData.emote}`);
             }
         }
 
@@ -234,10 +232,10 @@ socket.on('sync_game_state', ({ actionData, fullState }) => {
                 playSound(sfxToken, 1.6);
             } else if (actionData.type === 'BUY_CARD' || actionData.type === 'BUY_RESERVED') {
                 playSound(sfxPurchase, 1.5);
-                ui.showToast(`✦ A cuisine card was acquired!`);
+                ui.showToast(`✦ A development card was acquired!`);
             } else if (actionData.type === 'RESERVE_CARD') {
                 playSound(sfxReserve, 1.2);
-                ui.showToast(`✦ A cuisine card was reserved.`);
+                ui.showToast(`✦ A development card was reserved.`);
             }
         }
     } catch (err) {
@@ -272,37 +270,6 @@ document.addEventListener('click', (e) => {
         sfxEnabled = !sfxEnabled;
         e.target.textContent = sfxEnabled ? '🔔 SFX: ON' : '🔕 SFX: OFF';
         return;
-    }
-
-    // Emotes Toggle & Selection
-    if (e.target.id === 'emotes-toggle-btn') {
-        const dropdown = document.getElementById('emotes-dropdown');
-        if (dropdown) {
-            dropdown.style.display = dropdown.style.display === 'grid' ? 'none' : 'grid';
-        }
-        return;
-    }
-
-    if (e.target.classList.contains('emote-btn')) {
-        const emote = e.target.dataset.emote;
-        if (emote) {
-            ui.showToast(`💬 <b>${myPlayerName}</b>: ${emote}`);
-            if (currentGameMode === 'online' && currentRoomCode) {
-                socket.emit('game_action', {
-                    roomCode: currentRoomCode,
-                    actionData: { type: 'EMOTE', emote, senderName: myPlayerName }
-                });
-            }
-        }
-        const dropdown = document.getElementById('emotes-dropdown');
-        if (dropdown) dropdown.style.display = 'none';
-        return;
-    }
-
-    // Close emote dropdown if clicked outside
-    const emoteDropdown = document.getElementById('emotes-dropdown');
-    if (emoteDropdown && !e.target.closest('#emotes-dropdown') && e.target.id !== 'emotes-toggle-btn') {
-        emoteDropdown.style.display = 'none';
     }
 
     // Copy Room Code click handlers
@@ -369,14 +336,14 @@ document.addEventListener('click', (e) => {
         document.getElementById('mode-select-overlay').style.display = 'none';
         
         currentGameMode = 'pass_and_play';
-        myPlayerName = 'Chef 1';
+        myPlayerName = 'Merchant 1';
         ui.gameMode = 'pass_and_play';
-        ui.localPlayerName = 'Chef 1';
+        ui.localPlayerName = 'Merchant 1';
         ui.currentRoomCode = null;
 
         const names = [];
         for (let i = 1; i <= chosenPlayerCount; i++) {
-            names.push(`Chef ${i}`);
+            names.push(`Merchant ${i}`);
         }
         game.initializeGame(names, false);
         ui.renderAll();
@@ -407,7 +374,7 @@ document.addEventListener('click', (e) => {
             return;
         }
         if (!playerName) {
-            alert("Please enter your Chef Name.");
+            alert("Please enter your Merchant Name.");
             return;
         }
 

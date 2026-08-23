@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gem Merchant - Malaysian Cuisine Edition</title>
+    <title>Gem Merchant</title>
     
     <!-- Socket.io Client Script for Online Multiplayer -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -21,7 +21,7 @@
     <div id="mode-select-overlay" class="modal-overlay" style="display: flex;">
         <div class="modal-box" style="max-width: 440px;">
             <h1 style="font-family: 'Cinzel', serif; color: var(--gold); margin-top: 0; margin-bottom: 5px; font-size: 1.8em; letter-spacing: 2px;">GEM MERCHANT</h1>
-            <div style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 20px; letter-spacing: 1px; text-transform: uppercase;">Malaysian Cuisine Edition</div>
+            <div style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 20px; letter-spacing: 1px; text-transform: uppercase;">Master the Gem Trade</div>
             
             <p style="margin-bottom: 10px; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.5px;">Select Number of Players (2 - 4):</p>
             <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 20px;">
@@ -46,17 +46,17 @@
     <div id="online-lobby-overlay" class="modal-overlay" style="display: none;">
         <div class="modal-box" style="max-width: 450px;">
             <h2 style="font-family: 'Cinzel', serif; color: var(--gold); margin-top: 0; margin-bottom: 5px; font-size: 1.6em; letter-spacing: 1px;">ONLINE MULTIPLAYER</h2>
-            <div style="font-size: 0.8em; color: var(--text-muted); margin-bottom: 18px;">Play with friends anywhere across the world</div>
+            <div style="font-size: 0.8em; color: var(--text-muted); margin-bottom: 18px;">Trade gems with merchants anywhere</div>
             
             <!-- Join / Create Form -->
             <div id="lobby-join-form" style="display: flex; flex-direction: column; gap: 12px;">
                 <div>
                     <label style="display: block; font-size: 0.8em; margin-bottom: 4px; text-transform: uppercase; text-align: left; color: var(--gold);">Room Code:</label>
-                    <input type="text" id="room-code-input" placeholder="e.g. foodcourt88" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: 1px solid var(--panel-border); background: #040d16; color: var(--text-gold); font-size: 1.05em; text-align: center; font-family: inherit; font-weight: bold;">
+                    <input type="text" id="room-code-input" placeholder="e.g. emerald88" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: 1px solid var(--panel-border); background: #040d16; color: var(--text-gold); font-size: 1.05em; text-align: center; font-family: inherit; font-weight: bold;">
                 </div>
                 <div>
-                    <label style="display: block; font-size: 0.8em; margin-bottom: 4px; text-transform: uppercase; text-align: left; color: var(--gold);">Your Chef Name:</label>
-                    <input type="text" id="player-name-input" placeholder="e.g. Chef Shiaw" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: 1px solid var(--panel-border); background: #040d16; color: var(--text-gold); font-size: 1.05em; text-align: center; font-family: inherit;">
+                    <label style="display: block; font-size: 0.8em; margin-bottom: 4px; text-transform: uppercase; text-align: left; color: var(--gold);">Your Merchant Name:</label>
+                    <input type="text" id="player-name-input" placeholder="e.g. Shiaw" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: 1px solid var(--panel-border); background: #040d16; color: var(--text-gold); font-size: 1.05em; text-align: center; font-family: inherit;">
                 </div>
                 <button id="lobby-join-btn" class="buy-btn" style="padding: 12px; font-size: 1em; margin-top: 6px; background: linear-gradient(to bottom, #27ae60, #219653); color: white;">ENTER ROOM</button>
                 <button id="lobby-back-to-mode-btn" class="res-btn" style="padding: 10px; font-size: 0.85em;">Back to Main Menu</button>
@@ -71,7 +71,7 @@
                 </div>
 
                 <div>
-                    <div style="font-size: 0.8em; text-transform: uppercase; margin-bottom: 8px; text-align: left; color: var(--text-gold);">Connected Chefs (<span id="lobby-player-count">0</span>):</div>
+                    <div style="font-size: 0.8em; text-transform: uppercase; margin-bottom: 8px; text-align: left; color: var(--text-gold);">Connected Merchants (<span id="lobby-player-count">0</span>):</div>
                     <ul id="lobby-player-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px;"></ul>
                 </div>
 
@@ -98,21 +98,21 @@
             </div>
             
             <div style="font-size: 0.85em; line-height: 1.6; color: #e6d3a8;">
-                <p><b>Goal:</b> Be the first chef to reach <b>15 Prestige Points</b> to trigger the final round and win the game!</p>
+                <p><b>Goal:</b> Be the first merchant to reach <b>15 Prestige Points</b> to trigger the final round and win the game!</p>
                 
                 <h4 style="color: var(--gold); margin: 12px 0 4px 0;">On your turn, choose ONE action:</h4>
                 <ul style="padding-left: 20px; margin: 6px 0;">
-                    <li><b>Take 3 Different Tokens:</b> Pick 3 tokens of different gem colors from the bank.</li>
-                    <li><b>Take 2 Identical Tokens:</b> Pick 2 tokens of the SAME color (allowed only if bank has 4 or more available).</li>
-                    <li><b>Purchase a Cuisine Card:</b> Spend your tokens to acquire a dish. The card grants permanent prestige points and a permanent gem discount on future purchases!</li>
-                    <li><b>Reserve a Card (Hold):</b> Reserve 1 visible card into your private hand (max 3) and gain 1 Gold wild token (if available).</li>
+                    <li><b>Take 3 Different Gem Tokens:</b> Collect 3 tokens of different colors (Ruby, Sapphire, Emerald, Onyx, Pearl).</li>
+                    <li><b>Take 2 Identical Gem Tokens:</b> Collect 2 tokens of the SAME color (allowed only if bank has 4 or more available).</li>
+                    <li><b>Purchase a Development Card:</b> Spend your gem tokens to acquire a card. Development cards grant permanent prestige points and permanent gem discounts on all future purchases!</li>
+                    <li><b>Reserve a Card (Hold):</b> Reserve 1 card into your hand (max 3) and gain 1 Gold wild token (if available).</li>
                 </ul>
 
                 <h4 style="color: var(--gold); margin: 12px 0 4px 0;">Noble Patrons:</h4>
-                <p style="margin: 4px 0;">If you accumulate enough permanent dish bonuses matching a Patron's requirements, they automatically visit you for +3 extra points at the end of your turn!</p>
+                <p style="margin: 4px 0;">If you accumulate enough permanent gem card bonuses matching a Noble Patron's requirements, they visit your merchant guild for +3 bonus prestige points at the end of your turn!</p>
 
                 <h4 style="color: var(--gold); margin: 12px 0 4px 0;">Token Limit:</h4>
-                <p style="margin: 4px 0;">You can hold a maximum of <b>10 tokens</b>. If you exceed 10 at the end of your turn, you must discard the excess back to the bank.</p>
+                <p style="margin: 4px 0;">A merchant can hold a maximum of <b>10 tokens</b>. If you exceed 10 at the end of your turn, you must discard the excess tokens back to the bank.</p>
             </div>
             
             <button id="close-rules-bottom-btn" class="buy-btn" style="margin-top: 15px; width: 100%; padding: 8px;">Got It!</button>
@@ -145,17 +145,6 @@
             </div>
 
             <div class="nav-right">
-                <div style="position: relative; display: inline-block;">
-                    <button id="emotes-toggle-btn" class="nav-btn" title="Send reaction to players">💬 Reactions</button>
-                    <div id="emotes-dropdown" class="emotes-dropdown-menu">
-                        <button class="emote-btn nav-btn" data-emote="😋 Sedap!">😋 Sedap!</button>
-                        <button class="emote-btn nav-btn" data-emote="🔥 Nice Move!">🔥 Nice!</button>
-                        <button class="emote-btn nav-btn" data-emote="⏳ Hurry Up!">⏳ Hurry!</button>
-                        <button class="emote-btn nav-btn" data-emote="☕ Teh Tarik!">☕ Teh Tarik</button>
-                        <button class="emote-btn nav-btn" data-emote="👑 Pro Chef!">👑 Pro!</button>
-                        <button class="emote-btn nav-btn" data-emote="😱 GG!">😱 GG!</button>
-                    </div>
-                </div>
                 <button id="music-toggle-btn" class="nav-btn">🔊 Music: OFF</button>
                 <button id="sfx-toggle-btn" class="nav-btn">🔔 SFX: ON</button>
                 <button id="leave-game-btn" class="nav-btn" style="border-color: #e74c3c; color: #e74c3c;">Leave</button>

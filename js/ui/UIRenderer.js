@@ -136,9 +136,9 @@ export class UIRenderer {
                 </div>
 
                 <div style="display: flex; flex-direction: column; justify-content: center; color: var(--text-gold); flex-grow: 1;">
-                    <h3 style="font-family: 'Cinzel', serif; color: var(--gold); margin-top: 0; margin-bottom: 8px; font-size: 1.3em; border-bottom: 1px solid #5a4b31; padding-bottom: 6px;">${cardData.name || (isPatron ? 'Noble Food Patron' : 'Malaysian Cuisine')}</h3>
+                    <h3 style="font-family: 'Cinzel', serif; color: var(--gold); margin-top: 0; margin-bottom: 8px; font-size: 1.3em; border-bottom: 1px solid #5a4b31; padding-bottom: 6px;">${isPatron ? 'Noble Patron' : `Tier ${cardData.tier} Development Card`}</h3>
                     <div style="margin-bottom: 15px;">
-                        <b style="color: var(--gold-light); font-size: 0.85em; text-transform: uppercase;">${isPatron ? 'Bonus Requirements' : 'Token Cost'}:</b>
+                        <b style="color: var(--gold-light); font-size: 0.85em; text-transform: uppercase;">${isPatron ? 'Requirements' : 'Token Cost'}:</b>
                         <div style="margin-top: 8px; max-height: 140px; overflow-y: auto;">${costHTML || 'None'}</div>
                     </div>
                     <button id="modal-close-action" class="buy-btn" style="margin-top: auto; padding: 8px; font-size: 0.85em; width: 100%;">Close Preview</button>
@@ -286,7 +286,7 @@ export class UIRenderer {
         const currentPlayer = this.game.getCurrentPlayer ? this.game.getCurrentPlayer() : null;
         const isMyTurn = this.isCurrentPlayerLocal();
 
-        const tierNames = { 3: 'TIER 3 (GOURMET)', 2: 'TIER 2 (SPECIALTY)', 1: 'TIER 1 (STREET FOOD)' };
+        const tierNames = { 3: 'TIER 3', 2: 'TIER 2', 1: 'TIER 1' };
 
         for (let tier = 1; tier <= 3; tier++) {
             const container = document.getElementById(`market-tier-${tier}`);
@@ -344,7 +344,6 @@ export class UIRenderer {
                     <div class="splendor-cost-container">
                         ${costBadgesHTML}
                     </div>
-                    <div class="card-dish-name-badge" title="${card.name}">${card.name}</div>
                     <div class="btn-group">
                         <button class="buy-btn" data-tier="${tier}" data-id="${card.id}">BUY</button>
                         <button class="res-btn" data-tier="${tier}" data-id="${card.id}">HOLD</button>
@@ -359,7 +358,7 @@ export class UIRenderer {
     renderPlayers() {
         const container = document.getElementById('players-sidebar');
         if (!container) return;
-        container.innerHTML = '<div style="font-family: \'Cinzel\', serif; color: var(--gold); margin-bottom: 8px; font-size: 0.9em; font-weight: bold;">CHEF DASHBOARDS</div>';
+        container.innerHTML = '<div style="font-family: \'Cinzel\', serif; color: var(--gold); margin-bottom: 8px; font-size: 0.9em; font-weight: bold;">MERCHANT DASHBOARDS</div>';
 
         if (!this.game.players || this.game.players.length === 0) return;
 
@@ -496,7 +495,7 @@ export class UIRenderer {
                         <thead>
                             <tr style="border-bottom: 2px solid var(--panel-border); color: var(--gold);">
                                 <th style="padding: 6px;">Rank</th>
-                                <th style="padding: 6px; text-align: left;">Chef</th>
+                                <th style="padding: 6px; text-align: left;">Merchant</th>
                                 <th style="padding: 6px;">Points</th>
                                 <th style="padding: 6px;">Cards</th>
                             </tr>
