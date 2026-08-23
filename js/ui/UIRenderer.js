@@ -3,7 +3,39 @@ import { RuleEngine } from '../engine/RuleEngine.js';
 export class UIRenderer {
     constructor(gameState) {
         this.game = gameState;
+        this.localPlayerName = 'You';
+        this.gameMode = 'solo'; // 'solo' | 'pass_and_play' | 'online'
         this.setupCardZoomModal();
+    }
+
+    isCurrentPlayerLocal() {
+        const currentPlayer = this.game.getCurrentPlayer ? this.game.getCurrentPlayer() : null;
+        if (!currentPlayer) return false;
+        if (this.gameMode === 'solo') {
+            return this.game.currentPlayerIndex === 0;
+        }
+        if (this.gameMode === 'pass_and_play') {
+            return true;
+        }
+        if (this.gameMode === 'online') {
+            return currentPlayer.name.trim().toLowerCase() === (this.localPlayerName || '').trim().toLowerCase();
+        }
+        return true;
+    }
+
+    isPlayerLocal(player) {
+        if (!player) return false;
+        if (this.gameMode === 'solo') {
+            return player.name.toLowerCase() === 'you';
+        }
+        if (this.gameMode === 'pass_and_play') {
+            const currentPlayer = this.game.getCurrentPlayer ? this.game.getCurrentPlayer() : null;
+            return currentPlayer && currentPlayer.name === player.name;
+        }
+        if (this.gameMode === 'online') {
+            return player.name.trim().toLowerCase() === (this.localPlayerName || '').trim().toLowerCase();
+        }
+        return true;
     }
 
     getCardArtPath(card) {
@@ -28,6 +60,20 @@ export class UIRenderer {
         this.renderPatrons();
         this.renderPlayers();
         this.checkVictoryModal();
+
+        if (this.game.needsToDiscard) {
+            const currentPlayer = this.game.getCurrentPlayer ? this.game.getCurrentPlayer() : null;
+            if (currentPlayer) {
+                const excess = currentPlayer.getTotalTokenCount() - 10;
+                if (excess > 0 && this.isCurrentPlayerLocal()) {
+                    this.renderDiscardModal(excess);
+                } else {
+                    this.hideDiscardModal();
+                }
+            }
+        } else {
+            this.hideDiscardModal();
+        }
     }
 
     setupCardZoomModal() {
@@ -97,7 +143,8 @@ export class UIRenderer {
         if (!statusEl) return;
         
         if (this.game.isGameOver) {
-            statusEl.innerHTML = `<div class="turn-banner game-over">🏆 GAME OVER! WINNER: ${this.game.players[0]?.name?.toUpperCase() || 'NONE'} 🏆</div>`;
+            const winner = this.game.players[0]?.name?.toUpperCase() || 'NONE';
+            statusEl.innerHTML = `<div class="turn-banner game-over">🏆 GAME OVER! WINNER: ${winner} 🏆</div>`;
         } else if (this.game.isFinalRound) {
             statusEl.innerHTML = `<div class="turn-banner final-round">⚡ FINAL ROUND! ⚡</div>`;
         } else {
@@ -107,8 +154,10 @@ export class UIRenderer {
             
             if (isAiTurn) {
                 statusEl.innerHTML = `<div class="turn-banner ai-turn">🤖 ${playerName.toUpperCase()} IS THINKING...</div>`;
-            } else {
+            } else if (this.isCurrentPlayerLocal()) {
                 statusEl.innerHTML = `<div class="turn-banner my-turn">⭐ YOUR TURN (${playerName.toUpperCase()}) ⭐</div>`;
+            } else {
+                statusEl.innerHTML = `<div class="turn-banner" style="color: #e6d3a8; border-color: #5a4b31;">⏳ WAITING FOR ${playerName.toUpperCase()}'S TURN...</div>`;
             }
         }
     }
@@ -201,7 +250,7 @@ export class UIRenderer {
 
     renderMarket() {
         const currentPlayer = this.game.getCurrentPlayer ? this.game.getCurrentPlayer() : null;
-        const isMyTurn = currentPlayer && currentPlayer.name.toLowerCase() === 'you';
+        const isMyTurn = this.isCurrentPlayerLocal();
 
         for (let tier = 1; tier <= 3; tier++) {
             const container = document.getElementById(`market-tier-${tier}`);
@@ -217,7 +266,7 @@ export class UIRenderer {
                 const cardDiv = document.createElement('div');
                 
                 let canAfford = false;
-                if (isMyTurn) {
+                if (isMyTurn && currentPlayer) {
                     try {
                         RuleEngine.calculateActualCost(currentPlayer, card.cost);
                         canAfford = true;
@@ -272,7 +321,7 @@ export class UIRenderer {
 
         this.game.players.forEach((player, index) => {
             const isActive = index === this.game.currentPlayerIndex;
-            const isUser = player.name.toLowerCase() === 'you'; 
+            const isUser = this.isPlayerLocal(player); 
             const playerDiv = document.createElement('div');
             playerDiv.className = `player-board ${isActive ? 'active-player' : ''}`;
             
@@ -323,7 +372,7 @@ export class UIRenderer {
                         reservedHTML += `
                             <div class="zoomable-reserved-card" data-card-id="${card.id}" style="background: rgba(0,0,0,0.3); padding: 4px; margin-bottom: 4px; border-radius: 4px; font-size: 0.7em; cursor: pointer; border: 1px solid rgba(212,175,55,0.3);">
                                 <b>${card.points} Pts</b> (<span class="mini-dot gem-${card.bonus}"></span>) Cost: ${costStr}<br>
-                                <button class="buy-res-btn" data-id="${card.id}" style="margin-top: 3px; width: 100%; padding: 2px;" class="buy-btn">
+                                <button class="buy-res-btn buy-btn" data-id="${card.id}" style="margin-top: 3px; width: 100%; padding: 2px;">
                                     ${canAffordRes ? '🟢 Buy Reserved' : 'Buy Reserved'}
                                 </button>
                             </div>`;

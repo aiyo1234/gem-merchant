@@ -164,7 +164,7 @@ body {
     color: #e6d3a8;
 }
 
-.gem-diamond { background-color: #bdc3c7; }
+.gem-diamond, .gem-pearl { background-color: #ecf0f1; color: #1a0f00; }
 .gem-sapphire { background-color: #2980b9; }
 .gem-emerald { background-color: #27ae60; }
 .gem-ruby { background-color: #c0392b; }

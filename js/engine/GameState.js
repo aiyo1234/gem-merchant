@@ -78,10 +78,7 @@ export class GameState {
             }
 
             const assignedPhoto = photoPool[poolIndex++];
-            const uniqueCardId = `${data.id}_${Math.random().toString(36).substr(2, 5)}`;
-
-            const card = new Card(uniqueCardId, data.tier, data.points, data.bonus, data.cost);
-            card.artIndex = assignedPhoto;
+            const card = new Card(data.id, data.tier, data.points, data.bonus, data.cost, assignedPhoto);
             cardsByTier[data.tier].push(card);
         });
 
@@ -92,6 +89,49 @@ export class GameState {
         this.decks[1] = new Deck(1, cardsByTier[1]);
         this.decks[2] = new Deck(2, cardsByTier[2]);
         this.decks[3] = new Deck(3, cardsByTier[3]);
+    }
+
+    serializeInitialState() {
+        return {
+            playerNames: this.players.map(p => p.name),
+            isVsAi: this.isVsAi,
+            bank: { ...this.bank.tokens },
+            decks: {
+                1: this.decks[1].cards.map(c => ({ id: c.id, tier: c.tier, points: c.points, bonus: c.bonus, cost: c.cost, artIndex: c.artIndex })),
+                2: this.decks[2].cards.map(c => ({ id: c.id, tier: c.tier, points: c.points, bonus: c.bonus, cost: c.cost, artIndex: c.artIndex })),
+                3: this.decks[3].cards.map(c => ({ id: c.id, tier: c.tier, points: c.points, bonus: c.bonus, cost: c.cost, artIndex: c.artIndex }))
+            },
+            visibleMarket: {
+                1: this.visibleMarket[1].map(c => ({ id: c.id, tier: c.tier, points: c.points, bonus: c.bonus, cost: c.cost, artIndex: c.artIndex })),
+                2: this.visibleMarket[2].map(c => ({ id: c.id, tier: c.tier, points: c.points, bonus: c.bonus, cost: c.cost, artIndex: c.artIndex })),
+                3: this.visibleMarket[3].map(c => ({ id: c.id, tier: c.tier, points: c.points, bonus: c.bonus, cost: c.cost, artIndex: c.artIndex }))
+            },
+            availablePatrons: this.availablePatrons.map(p => ({ id: p.id, points: p.points, requirements: p.requirements }))
+        };
+    }
+
+    loadInitialState(data) {
+        this.players = data.playerNames.map(name => new Player(name));
+        this.isVsAi = data.isVsAi || false;
+        this.bank = new ResourceBank();
+        this.bank.tokens = { ...data.bank };
+        this.currentPlayerIndex = 0;
+        this.turnNumber = 1;
+        this.isGameOver = false;
+        this.isFinalRound = false;
+        this.needsToDiscard = false;
+
+        this.decks = {
+            1: new Deck(1, data.decks[1].map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex)), false),
+            2: new Deck(2, data.decks[2].map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex)), false),
+            3: new Deck(3, data.decks[3].map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex)), false)
+        };
+        this.visibleMarket = {
+            1: data.visibleMarket[1].map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex)),
+            2: data.visibleMarket[2].map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex)),
+            3: data.visibleMarket[3].map(c => new Card(c.id, c.tier, c.points, c.bonus, c.cost, c.artIndex))
+        };
+        this.availablePatrons = data.availablePatrons.map(p => new Patron(p.id, p.points, p.requirements));
     }
 
     dealInitialMarket() {

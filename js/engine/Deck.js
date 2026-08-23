@@ -1,8 +1,10 @@
 export class Deck {
-    constructor(tier, cards) {
+    constructor(tier, cards, shouldShuffle = true) {
         this.tier = tier;
         this.cards = cards; // Array of Card objects
-        this.shuffle();
+        if (shouldShuffle) {
+            this.shuffle();
+        }
     }
 
     shuffle() {

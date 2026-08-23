@@ -41,6 +41,51 @@
         </div>
     </div>
 
+    <!-- Online Lobby Overlay -->
+    <div id="online-lobby-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(4, 13, 22, 0.95); display: none; justify-content: center; align-items: center; z-index: 2600;">
+        <div style="background: #0b1c2c; padding: 35px; border-radius: 12px; border: 2px solid #d4af37; text-align: center; color: #e6d3a8; max-width: 440px; width: 90%; box-shadow: 0 15px 35px rgba(0,0,0,0.8);">
+            <h2 style="font-family: 'Cinzel', serif; color: #d4af37; margin-top: 0; margin-bottom: 15px; font-size: 1.5em; letter-spacing: 1px;">ONLINE MULTIPLAYER</h2>
+            
+            <!-- Join / Create Form -->
+            <div id="lobby-join-form" style="display: flex; flex-direction: column; gap: 12px;">
+                <div>
+                    <label style="display: block; font-size: 0.85em; margin-bottom: 4px; text-transform: uppercase;">Room Code:</label>
+                    <input type="text" id="room-code-input" placeholder="e.g. room123" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: 1px solid #d4af37; background: #040d16; color: #e6d3a8; font-size: 1em; text-align: center; font-family: inherit;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.85em; margin-bottom: 4px; text-transform: uppercase;">Your Chef Name:</label>
+                    <input type="text" id="player-name-input" placeholder="e.g. Chef Shiaw" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: 1px solid #d4af37; background: #040d16; color: #e6d3a8; font-size: 1em; text-align: center; font-family: inherit;">
+                </div>
+                <button id="lobby-join-btn" class="buy-btn" style="padding: 12px; font-size: 1em; margin-top: 6px; background: linear-gradient(to bottom, #27ae60, #219653); color: white;">ENTER ROOM</button>
+                <button id="lobby-back-to-mode-btn" class="res-btn" style="padding: 10px; font-size: 0.9em;">Back to Main Menu</button>
+            </div>
+
+            <!-- Waiting Room Room Info -->
+            <div id="lobby-room-view" style="display: none; flex-direction: column; gap: 15px;">
+                <div style="background: rgba(0,0,0,0.4); padding: 10px; border-radius: 6px; border: 1px solid rgba(212,175,55,0.4);">
+                    <div style="font-size: 0.85em; text-transform: uppercase; color: #a38d59;">Room Code:</div>
+                    <div id="lobby-display-room-code" style="font-size: 1.4em; font-weight: bold; color: #f1c40f; letter-spacing: 2px;">-</div>
+                </div>
+
+                <div>
+                    <div style="font-size: 0.85em; text-transform: uppercase; margin-bottom: 8px;">Connected Chefs (<span id="lobby-player-count">0</span>):</div>
+                    <ul id="lobby-player-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px;"></ul>
+                </div>
+
+                <div id="lobby-host-controls" style="display: none; flex-direction: column; gap: 8px;">
+                    <button id="lobby-start-game-btn" class="buy-btn" style="padding: 12px; font-size: 1.1em; background: linear-gradient(to bottom, #f1c40f, #d4af37); color: #1a0f00; font-weight: bold;">🚀 START GAME</button>
+                    <div style="font-size: 0.75em; color: #a38d59;">(Requires 2 to 4 players to start)</div>
+                </div>
+
+                <div id="lobby-guest-msg" style="display: none; font-size: 0.9em; color: #3498db; font-style: italic;">
+                    ⏳ Waiting for the room host to start the game...
+                </div>
+
+                <button id="lobby-leave-room-btn" class="res-btn" style="padding: 8px; font-size: 0.85em; margin-top: 5px;">Leave Room</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Game Container -->
     <div id="game-container">
         <header id="game-header">
