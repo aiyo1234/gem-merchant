@@ -120,18 +120,7 @@ export class MCTSEngine {
             } catch (e) {}
         });
 
-        // 3. Reserving cards with gold
-        if ((player.reservedCards || []).length < 3 && (game.bank.tokens[RESOURCES.GOLD] || 0) > 0) {
-            for (let tier = 1; tier <= 3; tier++) {
-                (game.visibleMarket[tier] || []).forEach(card => {
-                    if (card.points >= 2) {
-                        actions.push({ type: 'RESERVE_CARD', tier, cardId: card.id, card });
-                    }
-                });
-            }
-        }
-
-        // 4. Token taking actions
+        // 3. Token taking actions
         const bank = game.bank.tokens;
         const availableGems = Object.entries(bank)
             .filter(([res, count]) => res !== 'gold' && count > 0)

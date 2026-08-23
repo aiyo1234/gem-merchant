@@ -404,26 +404,7 @@ export class GrandmasterAI {
         }
 
         // ==============================================================
-        // 7. STRATEGIC RESERVATION (LOCK HIGH-POINT TARGETS EARLY & GAIN GOLD)
-        // ==============================================================
-        if (canReserve && bankHasGold) {
-            // Find best visible 3, 4, or 5 point card to reserve
-            const visiblePointCards = futureCandidates.filter(c => !c.isReserved && c.card.points >= 2);
-            if (visiblePointCards.length > 0) {
-                visiblePointCards.sort((a, b) => b.card.points - a.card.points || b.speedScore - a.speedScore);
-                const bestToReserve = visiblePointCards[0];
-                if (bestToReserve.card.points >= 3 || aiPlayer.purchasedCards.length >= 2 || (criticalDenialCard && criticalDenialCard.card.id === bestToReserve.card.id)) {
-                    return {
-                        type: 'RESERVE_CARD',
-                        tier: bestToReserve.tier,
-                        cardId: bestToReserve.card.id
-                    };
-                }
-            }
-        }
-
-        // ==============================================================
-        // 8. OPTIMAL TOKEN COMBINATORICS (ALWAYS TAKE TOKENS TO BUILD RESERVES)
+        // 7. OPTIMAL TOKEN COMBINATORICS (AVOID RESERVING - FOCUS 100% ON TOKENS & BUYS)
         // ==============================================================
         const availableColors = Object.entries(bank)
             .filter(([res, count]) => res !== 'gold' && count > 0)
@@ -463,18 +444,6 @@ export class GrandmasterAI {
             if (takeCount > 0) {
                 const chosen = rankedColors.slice(0, takeCount);
                 return { type: 'TAKE_DIFFERENT', tokens: chosen };
-            }
-        }
-
-        // TACTIC: If unable to take tokens and bank has gold, reserve a Tier 3 card!
-        if (canReserve && bankHasGold) {
-            const visibleTier3 = (game.visibleMarket[3] || []);
-            if (visibleTier3.length > 0) {
-                return { type: 'RESERVE_CARD', tier: 3, cardId: visibleTier3[0].id };
-            }
-            const visibleTier2 = (game.visibleMarket[2] || []);
-            if (visibleTier2.length > 0) {
-                return { type: 'RESERVE_CARD', tier: 2, cardId: visibleTier2[0].id };
             }
         }
 
