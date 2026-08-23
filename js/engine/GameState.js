@@ -372,6 +372,11 @@ export class GameState {
         RuleEngine.validateTakeDifferent(this.bank, resources);
         
         const player = this.getCurrentPlayer();
+        this.lastTokenSnapshot = {
+            bank: { ...this.bank.tokens },
+            playerTokens: { ...player.tokens }
+        };
+
         resources.forEach(res => {
             this.bank.remove(res, 1);
             player.addToken(res, 1);
@@ -384,9 +389,23 @@ export class GameState {
         if (this.isGameOver) throw new Error("The game is already over.");
         RuleEngine.validateTakeTwo(this.bank, res);
         const player = this.getCurrentPlayer();
+        this.lastTokenSnapshot = {
+            bank: { ...this.bank.tokens },
+            playerTokens: { ...player.tokens }
+        };
+
         this.bank.remove(res, 2);
         player.addToken(res, 2);
         this.checkEndTurn();
+    }
+
+    cancelLastTokenAction() {
+        if (!this.lastTokenSnapshot) return;
+        const player = this.getCurrentPlayer();
+        this.bank.tokens = { ...this.lastTokenSnapshot.bank };
+        player.tokens = { ...this.lastTokenSnapshot.playerTokens };
+        this.needsToDiscard = false;
+        this.lastTokenSnapshot = null;
     }
 
     purchaseVisibleCard(tier, cardId) {

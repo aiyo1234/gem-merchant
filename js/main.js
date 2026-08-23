@@ -223,6 +223,9 @@ socket.on('sync_game_state', ({ actionData, fullState }) => {
                 game.purchaseReservedCard(actionData.cardId);
             } else if (actionData.type === 'DISCARD_TOKENS') {
                 game.discardTokens(actionData.tokens);
+            } else if (actionData.type === 'CANCEL_TOKEN_ACTION') {
+                game.cancelLastTokenAction();
+                ui.hideDiscardModal();
             }
         }
 
@@ -589,6 +592,28 @@ document.addEventListener('click', (e) => {
         } catch (err) {
             alert(err.message);
         }
+    }
+
+    // Cancel Discard and Take Fewer Tokens Button
+    if (e.target.id === 'cancel-discard-btn') {
+        if (!canLocalPlayerAct()) return;
+
+        game.cancelLastTokenAction();
+        selectedTokens = [];
+        ui.updatePendingTokensDisplay([]);
+        ui.hideDiscardModal();
+
+        if (currentGameMode === 'online' && currentRoomCode) {
+            socket.emit('game_action', {
+                roomCode: currentRoomCode,
+                actionData: { type: 'CANCEL_TOKEN_ACTION' },
+                fullState: game.serializeCurrentState()
+            });
+        }
+
+        ui.showToast("↩️ Token action rolled back! You can now select fewer tokens or buy a card.");
+        ui.renderAll();
+        return;
     }
 
     // Discard Tokens Confirmation Button

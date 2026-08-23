@@ -226,7 +226,13 @@ export class UIRenderer {
         if (pendingTokens && pendingTokens.length > 0) {
             actionsDiv.style.visibility = 'visible';
             const formatted = pendingTokens.map(res => `<span class="mini-dot gem-${res}" title="${res}"></span>`).join(' ');
-            displaySpan.innerHTML = `[ ${formatted} ]`;
+            
+            const player = this.game.getCurrentPlayer ? this.game.getCurrentPlayer() : null;
+            const currentCount = player && player.getTotalTokenCount ? player.getTotalTokenCount() : 0;
+            const projected = currentCount + pendingTokens.length;
+            const warningHTML = projected > 10 ? `<div style="color: #e74c3c; font-size: 0.72em; margin-top: 3px; font-weight: bold;">⚠️ Total: ${projected}/10 tokens (exceeds limit by ${projected - 10})</div>` : '';
+
+            displaySpan.innerHTML = `[ ${formatted} ]${warningHTML}`;
         } else {
             actionsDiv.style.visibility = 'hidden';
         }
@@ -563,12 +569,20 @@ export class UIRenderer {
         }
 
         overlay.innerHTML = `
-            <div class="modal-box" style="max-width: 420px;">
+            <div class="modal-box" style="max-width: 440px;">
                 <h2 style="color: #e74c3c; margin-top: 0;">Token Limit Exceeded</h2>
-                <p style="font-size: 0.9em;">You hold <b>${player.getTotalTokenCount ? player.getTotalTokenCount() : 0}</b> tokens (maximum 10). You must discard <b>${excess}</b> token(s):</p>
-                <div style="background: rgba(0,0,0,0.3); padding: 10px; margin: 15px 0; border-radius: 6px;">${tokenCounts}</div>
-                ${dropdownsHTML}
-                <button id="confirm-discard-btn" class="buy-btn" style="margin-top: 15px; font-size: 0.95em; padding: 8px 20px; width: 100%;">Discard Selected Tokens</button>
+                <p style="font-size: 0.9em; margin-bottom: 8px;">You hold <b>${player.getTotalTokenCount ? player.getTotalTokenCount() : 0}</b> tokens (maximum allowed: 10).</p>
+                <div style="background: rgba(0,0,0,0.3); padding: 8px 10px; margin: 10px 0; border-radius: 6px;">${tokenCounts}</div>
+                
+                <div style="margin-bottom: 15px;">
+                    <button id="cancel-discard-btn" class="res-btn" style="width: 100%; padding: 10px; font-size: 0.9em; background: linear-gradient(to bottom, #27ae60, #1e8449); color: #fff; font-weight: bold; cursor: pointer; border: 1px solid #2ecc71;">⬅️ Go Back & Take Fewer Tokens</button>
+                </div>
+
+                <div style="border-top: 1px solid rgba(212,175,55,0.2); padding-top: 10px;">
+                    <p style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 6px;">Or select <b>${excess}</b> token(s) to discard:</p>
+                    ${dropdownsHTML}
+                    <button id="confirm-discard-btn" class="buy-btn" style="margin-top: 10px; font-size: 0.9em; padding: 8px 16px; width: 100%;">Discard Selected Tokens</button>
+                </div>
             </div>
         `;
         overlay.style.display = 'flex';
