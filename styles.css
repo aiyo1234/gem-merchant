@@ -34,6 +34,22 @@ h1, h2, h3, h4, .cinzel-font {
     font-family: 'Cinzel', serif;
 }
 
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #040d16;
+}
+::-webkit-scrollbar-thumb {
+    background: #5a4b31;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--panel-border);
+}
+
 /* ==========================================
    APP HEADER & STATUS BAR
    ========================================== */
@@ -45,16 +61,53 @@ h1, h2, h3, h4, .cinzel-font {
 }
 
 #top-nav-bar {
+    position: relative;
+    z-index: 1000;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(11, 28, 44, 0.95);
+    background: #0b1c2c;
     border: 1px solid var(--panel-border);
     border-radius: 10px;
     padding: 8px 16px;
     margin-bottom: 10px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(6px);
+}
+
+.emotes-dropdown-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: #071524 !important;
+    border: 2px solid var(--panel-border) !important;
+    border-radius: 8px;
+    padding: 10px;
+    gap: 8px;
+    z-index: 99999 !important;
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.95);
+    grid-template-columns: repeat(3, 1fr);
+    min-width: 290px;
+}
+
+.emote-btn {
+    background: rgba(11, 28, 44, 0.95) !important;
+    border: 1px solid var(--panel-border) !important;
+    color: var(--text-gold) !important;
+    padding: 8px 6px;
+    font-size: 0.85em;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.15s;
+    text-align: center;
+}
+
+.emote-btn:hover {
+    background: var(--gold) !important;
+    color: #1a0f00 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(241, 196, 15, 0.5);
 }
 
 .nav-left, .nav-center, .nav-right {
