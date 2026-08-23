@@ -5,10 +5,9 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Enable CORS so your GitHub Pages frontend can talk to Render
 const io = new Server(server, {
     cors: {
-        origin: "*", // Allows connections from any frontend URL (like your GitHub Pages)
+        origin: "*",
         methods: ["GET", "POST"]
     }
 });
@@ -17,14 +16,14 @@ app.get('/', (req, res) => {
     res.send('Gem Merchant Multiplayer Server is Running!');
 });
 
-// Track rooms and players
+// Track rooms and their players/state
 const rooms = {};
 
 io.on('connection', (socket) => {
     console.log(`A user connected: ${socket.id}`);
 
-    // Listen for players joining a specific room code
-    socket.on('join-room', ({ roomCode, playerName }) => {
+    // Handle joining a room code
+    socket.on('join_room', ({ roomCode, playerName }) => {
         socket.join(roomCode);
         console.log(`${playerName} (${socket.id}) joined room: ${roomCode}`);
 
@@ -32,29 +31,28 @@ io.on('connection', (socket) => {
             rooms[roomCode] = { players: [] };
         }
 
-        // Add player to room list
+        // Avoid duplicate entries if reconnecting
+        rooms[roomCode].players = rooms[roomCode].players.filter(p => p.id !== socket.id);
         rooms[roomCode].players.push({ id: socket.id, name: playerName });
 
-        // Tell everyone in the room that a new player joined
-        io.to(roomCode).emit('player-joined', rooms[roomCode]);
-        
-        // Send updated game state to the room
-        io.to(roomCode).emit('update-game-state', {
-            room: roomCode,
-            players: rooms[roomCode].players,
-            turn: rooms[roomCode].players[0]?.name || 'Waiting...'
-        });
+        // Broadcast updated room players to everyone in the room
+        io.to(roomCode).emit('update_room', rooms[roomCode]);
     });
 
-    // Handle game actions (like picking tokens or buying cards)
-    socket.on('player-action', (data) => {
-        // Broadcast the action to everyone else in the same room
-        socket.to(data.roomCode).emit('update-game-state', data.newState);
+    // Handle game actions (taking tokens, buying cards, etc.) and sync to others
+    socket.on('game_action', ({ roomCode, actionData }) => {
+        console.log(`Action in room ${roomCode}:`, actionData);
+        // Send this action to everyone else in the same room
+        socket.to(roomCode).emit('sync_game_state', actionData);
     });
 
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);
-        // Optional: clean up rooms if players leave
+        // Remove player from any rooms they were in
+        for (const roomCode in rooms) {
+            rooms[roomCode].players = rooms[roomCode].players.filter(p => p.id !== socket.id);
+            io.to(roomCode).emit('update_room', rooms[roomCode]);
+        }
     });
 });
 
