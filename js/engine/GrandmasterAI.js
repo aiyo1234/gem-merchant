@@ -404,27 +404,83 @@ export class GrandmasterAI {
         }
 
         // ==============================================================
-        // 7. OPTIMAL TOKEN COMBINATORICS (AVOID RESERVING - FOCUS 100% ON TOKENS & BUYS)
+        // 7. TIER-1 ENGINE TARGETING & PRIORITIZED 2-TOKEN SELECTION
         // ==============================================================
+        // Find best visible Tier-1 cards that advance our strategy (Patron synergy + lane synergy)
+        const visibleTier1Candidates = (game.visibleMarket[1] || []).map(card => {
+            const evalData = evaluateCardForPurchase({ card, tier: 1, isReserved: false });
+            let missingTokens = 0;
+            const deficits = {};
+            for (const [res, amt] of Object.entries(card.cost || {})) {
+                const haveBonus = aiPlayer.bonuses[res] || 0;
+                const haveTokens = aiPlayer.tokens[res] || 0;
+                const needed = Math.max(0, amt - haveBonus);
+                if (haveTokens < needed) {
+                    const diff = needed - haveTokens;
+                    missingTokens += diff;
+                    deficits[res] = diff;
+                }
+            }
+            return { card, tier: 1, evalData, deficits, missingTokens, score: evalData.score };
+        }).sort((a, b) => b.score - a.score);
+
+        const bestTier1Target = visibleTier1Candidates[0];
+
+        // If player has fewer than 4 discounts and no major points yet, incorporate Tier-1 target deficits
+        const earlyGameFocus = (aiPlayer.purchasedCards.length < 4 && aiPlayer.prestige < 4);
+        const activeTarget = (earlyGameFocus && bestTier1Target) ? bestTier1Target : primaryTarget;
+
         const availableColors = Object.entries(bank)
             .filter(([res, count]) => res !== 'gold' && count > 0)
             .map(([res]) => res);
 
         const fourPlusColors = availableColors.filter(res => (bank[res] || 0) >= 4);
-        for (const res of fourPlusColors) {
-            if (primaryTarget && primaryTarget.deficits[res] >= 2 && aiPlayer.getTotalTokenCount() <= 8) {
-                return { type: 'TAKE_TWO', resource: res };
+
+        // PRIORITY 1: Prioritize taking 2 tokens of the same color if bank >= 4 and needed
+        if (aiPlayer.getTotalTokenCount() <= 8) {
+            // First check active target
+            for (const res of fourPlusColors) {
+                if (activeTarget && activeTarget.deficits && activeTarget.deficits[res] >= 2) {
+                    return { type: 'TAKE_TWO', resource: res };
+                }
+            }
+            // If early game, check any top Tier-1 card that needs 2 of that color
+            if (earlyGameFocus) {
+                for (const t1 of visibleTier1Candidates.slice(0, 3)) {
+                    for (const res of fourPlusColors) {
+                        if (t1.deficits && t1.deficits[res] >= 2) {
+                            return { type: 'TAKE_TWO', resource: res };
+                        }
+                    }
+                }
+            }
+            // Check primary target
+            for (const res of fourPlusColors) {
+                if (primaryTarget && primaryTarget.deficits && primaryTarget.deficits[res] >= 2) {
+                    return { type: 'TAKE_TWO', resource: res };
+                }
             }
         }
 
+        // PRIORITY 2: Take 3 Different Tokens based on Tier-1 & primary target deficits
         const combinedNeeds = {};
-        if (primaryTarget) {
-            for (const [res, count] of Object.entries(primaryTarget.deficits || {})) {
+        if (activeTarget && activeTarget.deficits) {
+            for (const [res, count] of Object.entries(activeTarget.deficits)) {
+                combinedNeeds[res] = (combinedNeeds[res] || 0) + (count * 120.0);
+            }
+        }
+        if (primaryTarget && primaryTarget.deficits) {
+            for (const [res, count] of Object.entries(primaryTarget.deficits)) {
+                combinedNeeds[res] = (combinedNeeds[res] || 0) + (count * 80.0);
+            }
+        }
+        if (earlyGameFocus && bestTier1Target && bestTier1Target.deficits) {
+            for (const [res, count] of Object.entries(bestTier1Target.deficits)) {
                 combinedNeeds[res] = (combinedNeeds[res] || 0) + (count * 100.0);
             }
         }
         for (const [res, weight] of Object.entries(patronDesirability)) {
-            combinedNeeds[res] = (combinedNeeds[res] || 0) + (weight * 10.0);
+            combinedNeeds[res] = (combinedNeeds[res] || 0) + (weight * 15.0);
         }
         for (const [res, count] of Object.entries(marketBonusDemand)) {
             combinedNeeds[res] = (combinedNeeds[res] || 0) + count;
