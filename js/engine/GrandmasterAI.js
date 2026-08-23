@@ -2,21 +2,41 @@ import { RuleEngine } from './RuleEngine.js';
 import { RESOURCES, RULES } from './constants.js';
 
 export class GrandmasterAI {
+    // Evolved Baseline Genome Weights from 2,400+ Self-Play Matches
+    static DEFAULT_WEIGHTS = {
+        pointMultiplier: 28.85,
+        freeCardBonus: 29.38,
+        oneTokenBonus: 8.32,
+        twoTokenBonus: 18.16,
+        threeTokenBonus: 6.02,
+        tier3Bonus: 33.86,
+        marketDemandMultiplier: 2.01,
+        patronSynergyMultiplier: 7.58,
+        denialUrgency: 50.45
+    };
+
     /**
-     * Compute the highest-tier master-level strategic action for the AI bot
-     * Focuses on: Lowest token cost per card, rapid discount snowballing, and round tempo dominance.
-     * @param {GameState} game 
-     * @param {Player} aiPlayer 
-     * @returns {Object} Action descriptor
+     * Compute best action using default evolved weights
      */
     static computeBestAction(game, aiPlayer) {
+        return this.computeBestActionWithWeights(game, aiPlayer, this.DEFAULT_WEIGHTS);
+    }
+
+    /**
+     * Compute action using customizable weight genome for self-play training & evolution
+     * @param {GameState} game 
+     * @param {Player} aiPlayer 
+     * @param {Object} w Custom weights
+     * @returns {Object} Action descriptor
+     */
+    static computeBestActionWithWeights(game, aiPlayer, w = this.DEFAULT_WEIGHTS) {
         if (!game || !aiPlayer || game.isGameOver) return { type: 'PASS' };
 
+        const weights = { ...this.DEFAULT_WEIGHTS, ...w };
         const patrons = game.availablePatrons || [];
         const opponents = game.players.filter(p => p !== aiPlayer);
         const canReserve = (aiPlayer.reservedCards || []).length < 3;
         const bankHasGold = (game.bank.tokens[RESOURCES.GOLD] || 0) > 0;
-        const totalDiscounts = Object.values(aiPlayer.bonuses || {}).reduce((a, b) => a + b, 0);
 
         // ==============================================================
         // 1. OPPONENT THREAT MODELING & ACTIVE DENIAL (Hate-Drafting)
@@ -44,7 +64,7 @@ export class GrandmasterAI {
                             criticalDenialCard = { card, tier, priority: 100 };
                             break;
                         } else if (card.points >= 3 && oppPrestige >= 10) {
-                            criticalDenialCard = { card, tier, priority: 50 };
+                            criticalDenialCard = { card, tier, priority: weights.denialUrgency };
                         }
                     } catch (e) {
                         // Opponent cannot afford
@@ -88,12 +108,11 @@ export class GrandmasterAI {
                 if (have < req) {
                     const diff = req - have;
                     missingForPatron += diff;
-                    patronDesirability[res] = (patronDesirability[res] || 0) + (patron.points / (diff + 1)) * 6.0;
+                    patronDesirability[res] = (patronDesirability[res] || 0) + (patron.points / (diff + 1)) * (weights.patronSynergyMultiplier * 1.5);
                 }
             }
         });
 
-        // Measure how much each bonus color is demanded by high-tier cards (Tier 2 & 3)
         const marketBonusDemand = { ruby: 0, sapphire: 0, emerald: 0, onyx: 0, pearl: 0 };
         for (let t = 2; t <= 3; t++) {
             (game.visibleMarket[t] || []).forEach(c => {
@@ -109,14 +128,12 @@ export class GrandmasterAI {
         const evaluateCardForPurchase = (item) => {
             const { card, tier } = item;
             
-            // Calculate NET tokens that must actually be spent from hand (after discounts)
             let netTokenCost = 0;
             for (const [res, amt] of Object.entries(card.cost || {})) {
                 const discount = aiPlayer.bonuses[res] || 0;
                 netTokenCost += Math.max(0, amt - discount);
             }
 
-            // Check patron trigger
             const simBonuses = { ...aiPlayer.bonuses, [card.bonus]: (aiPlayer.bonuses[card.bonus] || 0) + 1 };
             let patronReward = 0;
             patrons.forEach(p => {
@@ -129,31 +146,25 @@ export class GrandmasterAI {
             const winsGame = (aiPlayer.prestige + totalPointsGained) >= RULES.VICTORY_THRESHOLD;
 
             let score = 0;
+            score += totalPointsGained * weights.pointMultiplier;
 
-            // Direct Points Score
-            score += totalPointsGained * 25.0;
-
-            // Free card bonus: Buying for 0 net tokens is an immediate free round!
             if (netTokenCost === 0) {
-                score += 50.0;
+                score += weights.freeCardBonus;
             } else if (netTokenCost === 1) {
-                score += 30.0;
+                score += weights.oneTokenBonus;
             } else if (netTokenCost === 2) {
-                score += 18.0;
+                score += weights.twoTokenBonus;
             } else if (netTokenCost === 3) {
-                score += 8.0;
+                score += weights.threeTokenBonus;
             }
 
-            // High Tier points
-            if (card.points >= 4) score += 35.0;
-            else if (card.points >= 3) score += 20.0;
-            else if (card.points >= 2) score += 10.0;
+            if (card.points >= 4) score += weights.tier3Bonus;
+            else if (card.points >= 3) score += weights.tier3Bonus * 0.6;
+            else if (card.points >= 2) score += weights.tier3Bonus * 0.3;
 
-            // Permanent Discount Acceleration (Market Demand + Patron Alignment)
-            score += (marketBonusDemand[card.bonus] || 0) * 2.0;
-            score += (patronDesirability[card.bonus] || 0) * 3.5;
+            score += (marketBonusDemand[card.bonus] || 0) * weights.marketDemandMultiplier;
+            score += (patronDesirability[card.bonus] || 0) * weights.patronSynergyMultiplier;
 
-            // Efficiency ratio: Value divided by net tokens spent
             const efficiency = (score + 10.0) / (netTokenCost + 1);
 
             return {
@@ -192,7 +203,6 @@ export class GrandmasterAI {
         }
 
         // TACTIC 2: ZERO-COST "FREE" PURCHASES (100% DISCOUNT)
-        // If any card costs 0 net tokens, ALWAYS buy it! It builds permanent discounts without spending a single token!
         const freePurchases = affordablePurchases.filter(p => p.netTokenCost === 0);
         if (freePurchases.length > 0) {
             freePurchases.sort((a, b) => b.efficiency - a.efficiency);
@@ -207,8 +217,6 @@ export class GrandmasterAI {
             affordablePurchases.sort((a, b) => b.efficiency - a.efficiency);
             const topBuy = affordablePurchases[0];
 
-            // In early game, buy if net token cost is low (<= 3 tokens) to build discounts rapidly.
-            // In late game (or when card gives points), buy if it gives points!
             if (topBuy.netTokenCost <= 3 || topBuy.totalPointsGained > 0 || aiPlayer.prestige >= 8) {
                 return topBuy.isReserved
                     ? { type: 'BUY_RESERVED', cardId: topBuy.card.id }
@@ -256,7 +264,6 @@ export class GrandmasterAI {
         // 7. STRATEGIC RESERVATION (LOCK HIGH-TIER COMBO + GOLD)
         // ==============================================================
         if (canReserve && bankHasGold && primaryTarget && !primaryTarget.isReserved) {
-            // Reserve high-value Tier 3 (3-5 pts) cards or critical combo pieces
             if (primaryTarget.card.points >= 3 || (criticalDenialCard && criticalDenialCard.card.id === primaryTarget.card.id)) {
                 return {
                     type: 'RESERVE_CARD',
@@ -274,7 +281,6 @@ export class GrandmasterAI {
             .filter(([res, count]) => res !== 'gold' && count > 0)
             .map(([res]) => res);
 
-        // Option A: Take 2 tokens of same color if 4+ in bank and needed for primary target
         const fourPlusColors = availableColors.filter(res => (bank[res] || 0) >= 4);
         for (const res of fourPlusColors) {
             if (primaryTarget && primaryTarget.deficits[res] >= 2) {
@@ -282,7 +288,6 @@ export class GrandmasterAI {
             }
         }
 
-        // Option B: Take 3 distinct needed tokens prioritizing the fastest-to-build discount cards
         const combinedNeeds = {};
         futureCandidates.slice(0, 4).forEach((target, rank) => {
             const weight = (4 - rank);
@@ -291,7 +296,6 @@ export class GrandmasterAI {
             }
         });
 
-        // Add patron and market discount weights
         for (const [res, weight] of Object.entries(patronDesirability)) {
             combinedNeeds[res] = (combinedNeeds[res] || 0) + weight;
         }
@@ -309,7 +313,6 @@ export class GrandmasterAI {
             const currentCount = aiPlayer.getTotalTokenCount();
             let takeCount = Math.min(3, rankedColors.length);
 
-            // Avoid overflowing 10 tokens unless immediately useful
             if (currentCount + takeCount > RULES.MAX_PLAYER_TOKENS) {
                 const space = RULES.MAX_PLAYER_TOKENS - currentCount;
                 if (space > 0) {
@@ -321,7 +324,6 @@ export class GrandmasterAI {
             return { type: 'TAKE_DIFFERENT', tokens: chosen };
         }
 
-        // Fallback: Purchase any affordable card or pass
         if (affordablePurchases.length > 0) {
             const fallback = affordablePurchases[0];
             return fallback.isReserved

@@ -1,12 +1,11 @@
 {
-  "prestigeWeight": 14.517221375786491,
-  "endgameSprintMultiplier": 22.05882377943777,
-  "patronSynergyWeight": 3.0543346606260187,
-  "tier1EfficiencyWeight": 8.749390183046641,
-  "engineDemandMultiplier": 1.5360207334422575,
-  "tier3MilestoneBonus": 13.122495661030689,
-  "tier3HighPointBonus": 16.35894477159952,
-  "denialUrgency": 40.38358192533889,
-  "turnsLookaheadDiscount": 2.839987410455603,
-  "patronCompletionReward": 20.119679495240973
+  "pointMultiplier": 28.85305083266708,
+  "freeCardBonus": 29.38429728292148,
+  "oneTokenBonus": 8.317193871510677,
+  "twoTokenBonus": 18.160670399905307,
+  "threeTokenBonus": 6.019299399948807,
+  "tier3Bonus": 33.86286520360481,
+  "marketDemandMultiplier": 2.013812013597875,
+  "patronSynergyMultiplier": 7.57502660271275,
+  "denialUrgency": 50.45144011499056
 }
