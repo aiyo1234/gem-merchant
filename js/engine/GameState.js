@@ -52,9 +52,14 @@ export class GameState {
 
     setupPatrons() {
         const allPatronsData = getInitialPatrons();
-        const shuffled = allPatronsData.sort(() => 0.5 - Math.random());
+        // True Fisher-Yates uniform shuffle on all 10 Noble Patrons
+        const shuffled = [...allPatronsData];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
         // Official rules: Display number of players + 1 patrons (3 for 2p, 4 for 3p, 5 for 4p)
-        const patronCount = Math.min(allPatronsData.length, this.players.length + 1);
+        const patronCount = Math.min(shuffled.length, this.players.length + 1);
         const selected = shuffled.slice(0, patronCount);
         this.availablePatrons = selected.map(p => new Patron(p.id, p.points, p.requirements));
     }
@@ -65,19 +70,25 @@ export class GameState {
 
         // Unique photo pools for each tier so no two visible cards in market ever overlap
         // Tier 1 gets photos 1 to 20
-        const tier1Pool = [];
-        for (let i = 1; i <= 20; i++) tier1Pool.push(i);
-        tier1Pool.sort(() => 0.5 - Math.random());
+        const tier1Pool = Array.from({ length: 20 }, (_, i) => i + 1);
+        for (let i = tier1Pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [tier1Pool[i], tier1Pool[j]] = [tier1Pool[j], tier1Pool[i]];
+        }
 
         // Tier 2 gets photos 21 to 35
-        const tier2Pool = [];
-        for (let i = 21; i <= 35; i++) tier2Pool.push(i);
-        tier2Pool.sort(() => 0.5 - Math.random());
+        const tier2Pool = Array.from({ length: 15 }, (_, i) => i + 21);
+        for (let i = tier2Pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [tier2Pool[i], tier2Pool[j]] = [tier2Pool[j], tier2Pool[i]];
+        }
 
         // Tier 3 gets photos 36 to 45
-        const tier3Pool = [];
-        for (let i = 36; i <= 45; i++) tier3Pool.push(i);
-        tier3Pool.sort(() => 0.5 - Math.random());
+        const tier3Pool = Array.from({ length: 10 }, (_, i) => i + 36);
+        for (let i = tier3Pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [tier3Pool[i], tier3Pool[j]] = [tier3Pool[j], tier3Pool[i]];
+        }
 
         let idx1 = 0, idx2 = 0, idx3 = 0;
 
@@ -97,13 +108,18 @@ export class GameState {
             cardsByTier[data.tier].push(card);
         });
 
+        // Deep Fisher-Yates shuffle on each tier's deck
         for (let tier = 1; tier <= 3; tier++) {
-            cardsByTier[tier].sort(() => 0.5 - Math.random());
+            const deckCards = cardsByTier[tier];
+            for (let i = deckCards.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deckCards[i], deckCards[j]] = [deckCards[j], deckCards[i]];
+            }
         }
 
-        this.decks[1] = new Deck(1, cardsByTier[1]);
-        this.decks[2] = new Deck(2, cardsByTier[2]);
-        this.decks[3] = new Deck(3, cardsByTier[3]);
+        this.decks[1] = new Deck(1, cardsByTier[1], true);
+        this.decks[2] = new Deck(2, cardsByTier[2], true);
+        this.decks[3] = new Deck(3, cardsByTier[3], true);
     }
 
     serializeInitialState() {
