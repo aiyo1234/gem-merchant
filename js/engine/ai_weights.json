@@ -1,0 +1,12 @@
+{
+  "prestigeWeight": 14.517221375786491,
+  "endgameSprintMultiplier": 22.05882377943777,
+  "patronSynergyWeight": 3.0543346606260187,
+  "tier1EfficiencyWeight": 8.749390183046641,
+  "engineDemandMultiplier": 1.5360207334422575,
+  "tier3MilestoneBonus": 13.122495661030689,
+  "tier3HighPointBonus": 16.35894477159952,
+  "denialUrgency": 40.38358192533889,
+  "turnsLookaheadDiscount": 2.839987410455603,
+  "patronCompletionReward": 20.119679495240973
+}
