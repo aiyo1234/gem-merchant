@@ -1,12 +1,13 @@
 {
-  "pointWeight": 506.94,
-  "cardPointWeight": 180.52,
-  "patronRewardWeight": 594.82,
-  "tokenCostPenalty": 17.9,
-  "freeCardBonus": 95.45,
-  "engineVelocityMultiplier": 36.46,
-  "pointVelocityPower": 1.16,
-  "denialBonus": 46.7,
-  "takeTwoThreshold": 3.21,
-  "tokenFlushThreshold": 7.32
+  "pointWeight": 516.3,
+  "cardPointWeight": 165.9,
+  "patronRewardWeight": 571.88,
+  "tokenCostPenalty": 17.01,
+  "freeCardBonus": 87.31,
+  "engineVelocityMultiplier": 43.58,
+  "pointVelocityPower": 0.82,
+  "denialBonus": 39.15,
+  "takeTwoThreshold": 2.68,
+  "tokenFlushThreshold": 7.19,
+  "goldReserveThreshold": 2.68
 }

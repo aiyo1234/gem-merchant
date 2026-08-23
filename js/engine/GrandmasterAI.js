@@ -90,7 +90,7 @@ export class GrandmasterAI {
                     }
                 });
                 const totalPoints = card.points + patronReward;
-                const velocity = (Math.pow(Math.max(0.1, totalPoints), 1.16) * 10.0 + 0.1) / turns;
+                const velocity = (Math.pow(Math.max(0.1, totalPoints), 0.82) * 10.0 + 0.1) / turns;
                 allMarketPointCards.push({ card, tier: t, isReserved: false, turns, totalPoints, velocity });
             });
         }
@@ -105,7 +105,7 @@ export class GrandmasterAI {
                 }
             });
             const totalPoints = card.points + patronReward;
-            const velocity = (Math.pow(Math.max(0.1, totalPoints), 1.16) * 12.0 + 0.1) / turns;
+            const velocity = (Math.pow(Math.max(0.1, totalPoints), 0.82) * 12.0 + 0.1) / turns;
             allMarketPointCards.push({ card, tier: card.tier, isReserved: true, turns, totalPoints, velocity });
         });
 
@@ -147,8 +147,8 @@ export class GrandmasterAI {
                 if (primaryTarget && (primaryTarget.card.cost[item.card.bonus] || 0) > 0) engineVelocity += 3;
                 if (secondaryTarget && (secondaryTarget.card.cost[item.card.bonus] || 0) > 0) engineVelocity += 2;
 
-                let score = (totalPoints * 506.94) + (item.card.points * 180.52) + (patronReward * 594.82) - (netTokens * 17.9) + (engineVelocity * 36.46);
-                if (netTokens === 0) score += 95.45;
+                let score = (totalPoints * 516.30) + (item.card.points * 165.90) + (patronReward * 571.88) - (netTokens * 17.01) + (engineVelocity * 43.58);
+                if (netTokens === 0) score += 87.31;
 
                 affordable.push({ ...item, totalPoints, patronReward, netTokens, wins, score, engineVelocity });
             } catch (e) {}
@@ -240,7 +240,7 @@ export class GrandmasterAI {
                 (game.visibleMarket[t] || []).forEach(c => {
                     if (c.points >= 2) {
                         for (const [r] of Object.entries(c.cost || {})) {
-                            if ((bank[r] || 0) === 4) oppNeeds[r] = (oppNeeds[r] || 0) + 46.7;
+                            if ((bank[r] || 0) === 4) oppNeeds[r] = (oppNeeds[r] || 0) + 39.15;
                         }
                     }
                 });
