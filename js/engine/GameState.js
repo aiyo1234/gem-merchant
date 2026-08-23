@@ -63,21 +63,36 @@ export class GameState {
         const allCardsData = getInitialCards();
         const cardsByTier = { 1: [], 2: [], 3: [] };
 
-        let photoPool = [];
-        const totalPhotos = 45;
-        for (let i = 1; i <= totalPhotos; i++) {
-            photoPool.push(i);
-        }
-        photoPool.sort(() => 0.5 - Math.random());
-        let poolIndex = 0;
+        // Unique photo pools for each tier so no two visible cards in market ever overlap
+        // Tier 1 gets photos 1 to 20
+        const tier1Pool = [];
+        for (let i = 1; i <= 20; i++) tier1Pool.push(i);
+        tier1Pool.sort(() => 0.5 - Math.random());
+
+        // Tier 2 gets photos 21 to 35
+        const tier2Pool = [];
+        for (let i = 21; i <= 35; i++) tier2Pool.push(i);
+        tier2Pool.sort(() => 0.5 - Math.random());
+
+        // Tier 3 gets photos 36 to 45
+        const tier3Pool = [];
+        for (let i = 36; i <= 45; i++) tier3Pool.push(i);
+        tier3Pool.sort(() => 0.5 - Math.random());
+
+        let idx1 = 0, idx2 = 0, idx3 = 0;
 
         allCardsData.forEach(data => {
-            if (poolIndex >= photoPool.length) {
-                photoPool.sort(() => 0.5 - Math.random());
-                poolIndex = 0;
+            let assignedPhoto = 1;
+            if (data.tier === 1) {
+                assignedPhoto = tier1Pool[idx1 % tier1Pool.length];
+                idx1++;
+            } else if (data.tier === 2) {
+                assignedPhoto = tier2Pool[idx2 % tier2Pool.length];
+                idx2++;
+            } else if (data.tier === 3) {
+                assignedPhoto = tier3Pool[idx3 % tier3Pool.length];
+                idx3++;
             }
-
-            const assignedPhoto = photoPool[poolIndex++];
             const card = new Card(data.id, data.tier, data.points, data.bonus, data.cost, assignedPhoto);
             cardsByTier[data.tier].push(card);
         });

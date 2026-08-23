@@ -616,22 +616,16 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Preload modern minimalist boardgame assets in background for instant rendering
+// Preload all 45 original card photos and 5 patron portraits in background for instant rendering
 function preloadGameAssets() {
-    const assets = [
-        'assets/art/tier1_card.jpg',
-        'assets/art/tier2_card.jpg',
-        'assets/art/tier3_card.jpg',
-        'assets/art/patron_1.jpg',
-        'assets/art/patron_2.jpg',
-        'assets/art/patron_3.jpg',
-        'assets/art/patron_4.jpg',
-        'assets/art/patron_5.jpg'
-    ];
-    assets.forEach(src => {
+    for (let i = 1; i <= 45; i++) {
         const img = new Image();
-        img.src = src;
-    });
+        img.src = `malaysian_cuisine_cards/card_t1_${i}.png`;
+    }
+    for (let i = 1; i <= 5; i++) {
+        const pImg = new Image();
+        pImg.src = `malaysian_cuisine_cards/patron_${i}.jpg`;
+    }
 }
 
 if (document.readyState === 'complete') {
