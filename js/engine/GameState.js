@@ -257,12 +257,41 @@ export class GameState {
     handleAiDiscard() {
         const aiPlayer = this.getCurrentPlayer();
         const excess = aiPlayer.getTotalTokenCount() - RULES.MAX_PLAYER_TOKENS;
+        if (excess <= 0) return;
+
+        // Patron desirability analysis
+        const patronBonusDesirability = { ruby: 0, sapphire: 0, emerald: 0, onyx: 0, pearl: 0 };
+        (this.availablePatrons || []).forEach(patron => {
+            for (const [res, req] of Object.entries(patron.requirements)) {
+                const currentBonus = aiPlayer.bonuses[res] || 0;
+                if (currentBonus < req) {
+                    patronBonusDesirability[res] = (patronBonusDesirability[res] || 0) + (req - currentBonus);
+                }
+            }
+        });
+
+        // Tokens least needed (or color player has highest token surplus) are discarded first
+        const tokenSurplus = Object.entries(aiPlayer.tokens)
+            .filter(([res, count]) => res !== 'gold' && count > 0)
+            .sort(([resA, countA], [resB, countB]) => {
+                const needA = patronBonusDesirability[resA] || 0;
+                const needB = patronBonusDesirability[resB] || 0;
+                // Discard lowest need first, or highest count
+                if (needA !== needB) return needA - needB;
+                return countB - countA;
+            });
+
         const tokensToDiscard = [];
-        
-        for (const [res, count] of Object.entries(aiPlayer.tokens)) {
+        for (const [res, count] of tokenSurplus) {
             for (let i = 0; i < count && tokensToDiscard.length < excess; i++) {
                 tokensToDiscard.push(res);
             }
+            if (tokensToDiscard.length >= excess) break;
+        }
+
+        // Fallback if gold needed to discard
+        if (tokensToDiscard.length < excess && aiPlayer.tokens['gold'] > 0) {
+            tokensToDiscard.push('gold');
         }
         
         setTimeout(() => {
@@ -310,43 +339,180 @@ export class GameState {
 
         setTimeout(() => {
             try {
-                const aiPlayer = this.getCurrentPlayer();
-                let purchased = false;
+                const ai = this.getCurrentPlayer();
+                if (!ai) return;
 
-                for (let tier = 3; tier >= 1; tier--) {
-                    const market = this.visibleMarket[tier];
-                    for (let i = 0; i < market.length; i++) {
-                        const card = market[i];
-                        try {
-                            RuleEngine.calculateActualCost(aiPlayer, card.cost);
-                            this.purchaseVisibleCard(tier, card.id);
-                            purchased = true;
-                            break;
-                        } catch (e) {
-                            // Can't afford
+                // 1. Gather all visible cards and reserved cards
+                const allCards = [];
+                for (let tier = 1; tier <= 3; tier++) {
+                    (this.visibleMarket[tier] || []).forEach(card => {
+                        allCards.push({ card, tier, isReserved: false });
+                    });
+                }
+                (ai.reservedCards || []).forEach(card => {
+                    allCards.push({ card, tier: card.tier, isReserved: true });
+                });
+
+                // 2. Identify Patron Needs
+                const patronBonusDesirability = { ruby: 0, sapphire: 0, emerald: 0, onyx: 0, pearl: 0 };
+                (this.availablePatrons || []).forEach(patron => {
+                    for (const [res, req] of Object.entries(patron.requirements)) {
+                        const currentBonus = ai.bonuses[res] || 0;
+                        if (currentBonus < req) {
+                            const diff = req - currentBonus;
+                            patronBonusDesirability[res] = (patronBonusDesirability[res] || 0) + (patron.points / (diff + 1)) * 3.0;
                         }
                     }
-                    if (purchased) break;
+                });
+
+                // 3. Strategic Card Evaluation
+                const scoreCard = (card, tier) => {
+                    let score = card.points * 8.0;
+
+                    // Patron synergy
+                    if (patronBonusDesirability[card.bonus]) {
+                        score += patronBonusDesirability[card.bonus] * 2.5;
+                    }
+
+                    // Engine building value
+                    score += (4 - tier) * 1.5;
+
+                    // Endgame point urgency
+                    if (ai.prestige >= 10 || this.isFinalRound) {
+                        score += card.points * 18.0;
+                    }
+
+                    return score;
+                };
+
+                // 4. Find all Affordable Cards
+                const affordableCards = [];
+                allCards.forEach(item => {
+                    try {
+                        RuleEngine.calculateActualCost(ai, item.card.cost);
+                        const score = scoreCard(item.card, item.tier);
+                        
+                        // Check if purchasing this card claims a patron
+                        const simBonuses = { ...ai.bonuses, [item.card.bonus]: (ai.bonuses[item.card.bonus] || 0) + 1 };
+                        const claimsPatron = (this.availablePatrons || []).some(p => {
+                            return Object.entries(p.requirements).every(([res, req]) => (simBonuses[res] || 0) >= req);
+                        });
+                        
+                        affordableCards.push({
+                            ...item,
+                            score: score + (claimsPatron ? 25.0 : 0)
+                        });
+                    } catch (e) {
+                        // Not affordable
+                    }
+                });
+
+                // OPTION A: Purchase best affordable card
+                if (affordableCards.length > 0) {
+                    affordableCards.sort((a, b) => b.score - a.score);
+                    const bestToBuy = affordableCards[0];
+
+                    if (bestToBuy.isReserved) {
+                        this.purchaseReservedCard(bestToBuy.card.id);
+                    } else {
+                        this.purchaseVisibleCard(bestToBuy.tier, bestToBuy.card.id);
+                    }
+                    return;
                 }
 
-                if (!purchased) {
-                    const availableRes = Object.entries(this.bank.tokens)
-                        .filter(([res, count]) => res !== 'gold' && count > 0)
-                        .map(([res]) => res);
+                // 5. If cannot buy, evaluate Top Target Cards to save for
+                const targetCards = allCards
+                    .filter(item => !item.isReserved)
+                    .map(item => {
+                        const score = scoreCard(item.card, item.tier);
+                        let missingTokens = 0;
+                        const neededByColor = {};
+                        for (const [res, amt] of Object.entries(item.card.cost)) {
+                            const haveBonus = ai.bonuses[res] || 0;
+                            const haveTokens = ai.tokens[res] || 0;
+                            const needed = Math.max(0, amt - haveBonus);
+                            if (haveTokens < needed) {
+                                const deficit = needed - haveTokens;
+                                missingTokens += deficit;
+                                neededByColor[res] = deficit;
+                            }
+                        }
+                        const gold = ai.tokens[RESOURCES.GOLD] || 0;
+                        missingTokens = Math.max(0, missingTokens - gold);
 
-                    const fourPlusRes = Object.entries(this.bank.tokens)
-                        .filter(([res, count]) => res !== 'gold' && count >= 4)
-                        .map(([res]) => res);
+                        return {
+                            ...item,
+                            score: score / (missingTokens + 1),
+                            missingTokens,
+                            neededByColor
+                        };
+                    })
+                    .sort((a, b) => b.score - a.score);
 
-                    if (fourPlusRes.length > 0 && Math.random() > 0.5) {
-                        this.takeTwoResources(fourPlusRes[0]);
-                    } else if (availableRes.length >= 2) {
-                        this.takeDifferentResources([availableRes[0], availableRes[1]]);
-                    } else if (availableRes.length === 1) {
-                        this.takeTwoResources(availableRes[0]);
-                    } else {
-                        this.advanceTurn();
+                const primaryTarget = targetCards[0];
+
+                // OPTION B: Strategic Reservation (Snatch high point card & gold token or block opponent)
+                const hasGoldInBank = (this.bank.tokens[RESOURCES.GOLD] || 0) > 0;
+                const opponentIsThreat = this.players.some(p => p !== ai && p.prestige >= 10);
+                
+                if ((ai.reservedCards || []).length < 3 && hasGoldInBank && primaryTarget) {
+                    if (primaryTarget.card.points >= 3 || (opponentIsThreat && primaryTarget.card.points >= 2)) {
+                        this.reserveVisibleCard(primaryTarget.tier, primaryTarget.card.id);
+                        return;
                     }
+                }
+
+                // OPTION C: Targeted Token Collection
+                if (primaryTarget && primaryTarget.neededByColor) {
+                    const neededColors = Object.keys(primaryTarget.neededByColor);
+
+                    // Try taking 2 of a needed color if 4+ in bank
+                    for (const color of neededColors) {
+                        if (this.bank.hasTokens(color, 4) && primaryTarget.neededByColor[color] >= 2) {
+                            this.takeTwoResources(color);
+                            return;
+                        }
+                    }
+
+                    // Take 3 different needed colors from bank
+                    const availableNeeded = neededColors.filter(c => this.bank.hasTokens(c, 1));
+                    
+                    const allAvailable = Object.entries(this.bank.tokens)
+                        .filter(([res, count]) => res !== 'gold' && count > 0)
+                        .map(([res]) => res)
+                        .sort((a, b) => (patronBonusDesirability[b] || 0) - (patronBonusDesirability[a] || 0));
+
+                    const toTake = [...availableNeeded];
+                    for (const color of allAvailable) {
+                        if (toTake.length >= 3) break;
+                        if (!toTake.includes(color)) toTake.push(color);
+                    }
+
+                    if (toTake.length > 0) {
+                        const currentTotal = ai.getTotalTokenCount();
+                        let takeCount = Math.min(toTake.length, 3);
+                        if (currentTotal + takeCount > 10 && takeCount > 1) {
+                            takeCount = Math.max(1, 10 - currentTotal);
+                        }
+                        const finalTokens = toTake.slice(0, Math.min(takeCount, 3));
+                        if (finalTokens.length > 0) {
+                            this.takeDifferentResources(finalTokens);
+                            return;
+                        }
+                    }
+                }
+
+                // Fallback token collection
+                const fallbackAvailable = Object.entries(this.bank.tokens)
+                    .filter(([res, count]) => res !== 'gold' && count > 0)
+                    .map(([res]) => res);
+
+                if (fallbackAvailable.length >= 3) {
+                    this.takeDifferentResources(fallbackAvailable.slice(0, 3));
+                } else if (fallbackAvailable.length > 0) {
+                    this.takeDifferentResources(fallbackAvailable);
+                } else {
+                    this.advanceTurn();
                 }
             } catch (err) {
                 console.error("AI Turn Error:", err);
@@ -354,7 +520,6 @@ export class GameState {
             } finally {
                 this.isAiPlaying = false;
                 if (window.gameUI) window.gameUI.renderAll();
-                
                 this.checkAndTriggerAiIfNeeded();
             }
         }, 700);
