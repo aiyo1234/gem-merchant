@@ -6,6 +6,7 @@ import { getInitialCards } from './cardData.js';
 import { RuleEngine } from './RuleEngine.js';
 import { RESOURCES, RULES } from './constants.js'; 
 import { Patron } from './Patron.js';
+import { GrandmasterAI } from './GrandmasterAI.js';
 
 function getInitialPatrons() {
     return [
@@ -342,187 +343,30 @@ export class GameState {
                 const ai = this.getCurrentPlayer();
                 if (!ai) return;
 
-                // 1. Gather all visible cards and reserved cards
-                const allCards = [];
-                for (let tier = 1; tier <= 3; tier++) {
-                    (this.visibleMarket[tier] || []).forEach(card => {
-                        allCards.push({ card, tier, isReserved: false });
-                    });
-                }
-                (ai.reservedCards || []).forEach(card => {
-                    allCards.push({ card, tier: card.tier, isReserved: true });
-                });
-
-                // 2. Identify Patron Needs
-                const patronBonusDesirability = { ruby: 0, sapphire: 0, emerald: 0, onyx: 0, pearl: 0 };
-                (this.availablePatrons || []).forEach(patron => {
-                    for (const [res, req] of Object.entries(patron.requirements)) {
-                        const currentBonus = ai.bonuses[res] || 0;
-                        if (currentBonus < req) {
-                            const diff = req - currentBonus;
-                            patronBonusDesirability[res] = (patronBonusDesirability[res] || 0) + (patron.points / (diff + 1)) * 3.0;
-                        }
-                    }
-                });
-
-                // 3. Strategic Card Evaluation
-                const scoreCard = (card, tier) => {
-                    let score = card.points * 8.0;
-
-                    // Patron synergy
-                    if (patronBonusDesirability[card.bonus]) {
-                        score += patronBonusDesirability[card.bonus] * 2.5;
-                    }
-
-                    // Engine building value
-                    score += (4 - tier) * 1.5;
-
-                    // Endgame point urgency
-                    if (ai.prestige >= 10 || this.isFinalRound) {
-                        score += card.points * 18.0;
-                    }
-
-                    return score;
-                };
-
-                // 4. Find all Affordable Cards
-                const affordableCards = [];
-                allCards.forEach(item => {
-                    try {
-                        RuleEngine.calculateActualCost(ai, item.card.cost);
-                        const score = scoreCard(item.card, item.tier);
-                        
-                        // Check if purchasing this card claims a patron
-                        const simBonuses = { ...ai.bonuses, [item.card.bonus]: (ai.bonuses[item.card.bonus] || 0) + 1 };
-                        const claimsPatron = (this.availablePatrons || []).some(p => {
-                            return Object.entries(p.requirements).every(([res, req]) => (simBonuses[res] || 0) >= req);
-                        });
-                        
-                        affordableCards.push({
-                            ...item,
-                            score: score + (claimsPatron ? 25.0 : 0)
-                        });
-                    } catch (e) {
-                        // Not affordable
-                    }
-                });
-
-                // OPTION A: Purchase best affordable card
-                if (affordableCards.length > 0) {
-                    affordableCards.sort((a, b) => b.score - a.score);
-                    const bestToBuy = affordableCards[0];
-
-                    if (bestToBuy.isReserved) {
-                        this.purchaseReservedCard(bestToBuy.card.id);
-                    } else {
-                        this.purchaseVisibleCard(bestToBuy.tier, bestToBuy.card.id);
-                    }
-                    return;
-                }
-
-                // 5. If cannot buy, evaluate Top Target Cards to save for
-                const targetCards = allCards
-                    .filter(item => !item.isReserved)
-                    .map(item => {
-                        const score = scoreCard(item.card, item.tier);
-                        let missingTokens = 0;
-                        const neededByColor = {};
-                        for (const [res, amt] of Object.entries(item.card.cost)) {
-                            const haveBonus = ai.bonuses[res] || 0;
-                            const haveTokens = ai.tokens[res] || 0;
-                            const needed = Math.max(0, amt - haveBonus);
-                            if (haveTokens < needed) {
-                                const deficit = needed - haveTokens;
-                                missingTokens += deficit;
-                                neededByColor[res] = deficit;
-                            }
-                        }
-                        const gold = ai.tokens[RESOURCES.GOLD] || 0;
-                        missingTokens = Math.max(0, missingTokens - gold);
-
-                        return {
-                            ...item,
-                            score: score / (missingTokens + 1),
-                            missingTokens,
-                            neededByColor
-                        };
-                    })
-                    .sort((a, b) => b.score - a.score);
-
-                const primaryTarget = targetCards[0];
-
-                // OPTION B: Strategic Reservation (Snatch high point card & gold token or block opponent)
-                const hasGoldInBank = (this.bank.tokens[RESOURCES.GOLD] || 0) > 0;
-                const opponentIsThreat = this.players.some(p => p !== ai && p.prestige >= 10);
+                const action = GrandmasterAI.computeBestAction(this, ai);
                 
-                if ((ai.reservedCards || []).length < 3 && hasGoldInBank && primaryTarget) {
-                    if (primaryTarget.card.points >= 3 || (opponentIsThreat && primaryTarget.card.points >= 2)) {
-                        this.reserveVisibleCard(primaryTarget.tier, primaryTarget.card.id);
-                        return;
-                    }
-                }
-
-                // OPTION C: Targeted Token Collection
-                if (primaryTarget && primaryTarget.neededByColor) {
-                    const neededColors = Object.keys(primaryTarget.neededByColor);
-
-                    // Try taking 2 of a needed color if 4+ in bank
-                    for (const color of neededColors) {
-                        if (this.bank.hasTokens(color, 4) && primaryTarget.neededByColor[color] >= 2) {
-                            this.takeTwoResources(color);
-                            return;
-                        }
-                    }
-
-                    // Take 3 different needed colors from bank
-                    const availableNeeded = neededColors.filter(c => this.bank.hasTokens(c, 1));
-                    
-                    const allAvailable = Object.entries(this.bank.tokens)
-                        .filter(([res, count]) => res !== 'gold' && count > 0)
-                        .map(([res]) => res)
-                        .sort((a, b) => (patronBonusDesirability[b] || 0) - (patronBonusDesirability[a] || 0));
-
-                    const toTake = [...availableNeeded];
-                    for (const color of allAvailable) {
-                        if (toTake.length >= 3) break;
-                        if (!toTake.includes(color)) toTake.push(color);
-                    }
-
-                    if (toTake.length > 0) {
-                        const currentTotal = ai.getTotalTokenCount();
-                        let takeCount = Math.min(toTake.length, 3);
-                        if (currentTotal + takeCount > 10 && takeCount > 1) {
-                            takeCount = Math.max(1, 10 - currentTotal);
-                        }
-                        const finalTokens = toTake.slice(0, Math.min(takeCount, 3));
-                        if (finalTokens.length > 0) {
-                            this.takeDifferentResources(finalTokens);
-                            return;
-                        }
-                    }
-                }
-
-                // Fallback token collection
-                const fallbackAvailable = Object.entries(this.bank.tokens)
-                    .filter(([res, count]) => res !== 'gold' && count > 0)
-                    .map(([res]) => res);
-
-                if (fallbackAvailable.length >= 3) {
-                    this.takeDifferentResources(fallbackAvailable.slice(0, 3));
-                } else if (fallbackAvailable.length > 0) {
-                    this.takeDifferentResources(fallbackAvailable);
+                if (action.type === 'BUY_CARD') {
+                    this.purchaseVisibleCard(action.tier, action.cardId);
+                } else if (action.type === 'BUY_RESERVED') {
+                    this.purchaseReservedCard(action.cardId);
+                } else if (action.type === 'RESERVE_CARD') {
+                    this.reserveVisibleCard(action.tier, action.cardId);
+                } else if (action.type === 'TAKE_TWO') {
+                    this.takeTwoResources(action.resource);
+                } else if (action.type === 'TAKE_DIFFERENT') {
+                    this.takeDifferentResources(action.tokens);
                 } else {
                     this.advanceTurn();
                 }
             } catch (err) {
-                console.error("AI Turn Error:", err);
+                console.error("Grandmaster AI Turn Error:", err);
                 this.advanceTurn();
             } finally {
                 this.isAiPlaying = false;
-                if (window.gameUI) window.gameUI.renderAll();
+                if (typeof window !== 'undefined' && window.gameUI) window.gameUI.renderAll();
                 this.checkAndTriggerAiIfNeeded();
             }
-        }, 700);
+        }, 600);
     }
 
     determineWinner() {
