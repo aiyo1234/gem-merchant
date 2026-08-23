@@ -1,5 +1,5 @@
-import { GameState } from './engine/GameState.js';
-import { UIRenderer } from './ui/UIRenderer.js';
+import { GameState } from './engine/GameState.js?v=8.2';
+import { UIRenderer } from './ui/UIRenderer.js?v=8.2';
 
 const game = new GameState();
 const ui = new UIRenderer(game);

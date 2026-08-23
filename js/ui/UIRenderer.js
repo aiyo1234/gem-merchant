@@ -570,22 +570,26 @@ export class UIRenderer {
             .filter(([_, amt]) => amt > 0)
             .map(([res, amt]) => {
                 const info = GEM_INFO[res] || { symbol: '💎', name: res };
-                return `<span class="inline-gem" style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; background: rgba(0,0,0,0.3); border-radius: 4px; margin: 2px;"><span class="mini-dot gem-${res}"></span> <span style="color: ${info.text || 'var(--text-gold)'}; font-weight: bold;">${info.symbol} ${amt}</span></span>`;
+                return `<span class="inline-gem" style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; background: rgba(0,0,0,0.3); border-radius: 4px; margin: 2px;"><span class="mini-dot gem-${res}"></span> <span style="color: ${info.text || 'var(--text-gold)'}; font-weight: bold;">${info.symbol} ${amt}</span></span>`;
             })
             .join(' &nbsp;|&nbsp; ');
 
+        const availableTokens = Object.entries(player.tokens || {}).filter(([_, amt]) => amt > 0);
+        const defaultColor = availableTokens.length > 0 ? availableTokens[0][0] : 'ruby';
+
         let dropdownsHTML = '';
         for (let i = 0; i < excess; i++) {
-            let options = Object.entries(player.tokens || {})
-                .filter(([_, amt]) => amt > 0)
+            let options = availableTokens
                 .map(([res, amt]) => {
                     const info = GEM_INFO[res] || { symbol: '💎', name: res, bg: '#040d16', text: '#fff' };
-                    return `<option value="${res}" style="background: ${info.bg}; color: ${info.text}; font-size: 1.05em; padding: 6px;">${info.symbol} ${info.name} (${amt} in hand)</option>`;
+                    return `<option value="${res}" style="background: ${info.bg}; color: ${info.text}; font-size: 1.1em; padding: 6px;">${info.symbol} ${info.name} (${amt} held)</option>`;
                 }).join('');
 
             dropdownsHTML += `
-                <div style="margin: 8px 0;">
-                    <select class="discard-select" style="width: 220px; padding: 10px 14px; font-family: inherit; font-size: 1em; font-weight: 600; border-radius: 6px; border: 1.5px solid var(--gold); background: #071526; color: var(--text-gold); cursor: pointer; text-align: left; box-shadow: 0 2px 6px rgba(0,0,0,0.5);">
+                <div class="discard-row" style="display: flex; align-items: center; justify-content: center; gap: 12px; margin: 10px 0;">
+                    <!-- Color Swatch Circle Preview Beside Text -->
+                    <div id="discard-preview-${i}" class="discard-preview-gem token ${defaultColor}" style="width: 38px; height: 38px; min-width: 38px; border-radius: 50%; border: 2.5px solid #fff; box-shadow: 0 3px 8px rgba(0,0,0,0.7);"></div>
+                    <select class="discard-select" data-preview-id="discard-preview-${i}" style="width: 210px; padding: 10px 14px; font-family: inherit; font-size: 1em; font-weight: 700; border-radius: 6px; border: 1.5px solid var(--gold); background: #071526; color: var(--text-gold); cursor: pointer; text-align: left; box-shadow: 0 2px 6px rgba(0,0,0,0.5);">
                         ${options}
                     </select>
                 </div>
@@ -619,6 +623,18 @@ export class UIRenderer {
                 </div>
             </div>
         `;
+
+        // Attach dynamic onChange listeners so the preview gem swatch updates live
+        overlay.querySelectorAll('.discard-select').forEach(sel => {
+            sel.onchange = (e) => {
+                const targetPreviewId = e.target.dataset.previewId;
+                const previewEl = document.getElementById(targetPreviewId);
+                if (previewEl) {
+                    previewEl.className = `discard-preview-gem token ${e.target.value}`;
+                }
+            };
+        });
+
         overlay.style.display = 'flex';
     }
 
