@@ -1,10 +1,12 @@
 {
-  "pointWeight": 455,
-  "cardPointWeight": 185,
-  "patronRewardWeight": 347.7455666724905,
-  "focusSynergyWeight": 115,
-  "tokenCostPenalty": 15,
-  "freeCardWeight": 61.22211378408428,
-  "denialSensitivity": 10.30992297626043,
-  "tokenFlushThreshold": 8
+  "pointWeight": 506.94,
+  "cardPointWeight": 180.52,
+  "patronRewardWeight": 594.82,
+  "tokenCostPenalty": 17.9,
+  "freeCardBonus": 95.45,
+  "engineVelocityMultiplier": 36.46,
+  "pointVelocityPower": 1.16,
+  "denialBonus": 46.7,
+  "takeTwoThreshold": 3.21,
+  "tokenFlushThreshold": 7.32
 }
