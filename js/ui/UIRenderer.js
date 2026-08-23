@@ -557,39 +557,116 @@ export class UIRenderer {
         const player = this.game.getCurrentPlayer ? this.game.getCurrentPlayer() : null;
         if (!player) return;
 
-        const tokenCounts = Object.entries(player.tokens || {})
-            .filter(([_, amt]) => amt > 0)
-            .map(([res, amt]) => `<span class="inline-gem"><span class="mini-dot gem-${res}"></span> <b>${amt}</b></span>`)
-            .join(' &nbsp;|&nbsp; ');
+        this.excessToDiscard = excess;
+        this.pendingDiscardTokens = [];
 
-        let dropdownsHTML = '';
-        for(let i = 0; i < excess; i++) {
-            let options = Object.entries(player.tokens || {}).filter(([_, amt]) => amt > 0).map(([res, amt]) => `<option value="${res}">${res.charAt(0).toUpperCase() + res.slice(1)}</option>`).join('');
-            dropdownsHTML += `<select class="discard-select" style="margin: 5px; padding: 8px; font-family: inherit; border-radius: 4px; border: 1px solid var(--panel-border); background: #040d16; color: var(--text-gold);">${options}</select><br>`;
-        }
+        this.updateDiscardModalContent(overlay, player);
+        overlay.style.display = 'flex';
+    }
+
+    updateDiscardModalContent(overlay, player) {
+        const excess = this.excessToDiscard;
+        const currentCount = player.getTotalTokenCount ? player.getTotalTokenCount() : 0;
+        const remainingNeeded = excess - (this.pendingDiscardTokens ? this.pendingDiscardTokens.length : 0);
+
+        // Calculate available tokens for discard taking into account already picked ones
+        const countsSelected = {};
+        (this.pendingDiscardTokens || []).forEach(r => countsSelected[r] = (countsSelected[r] || 0) + 1);
+
+        const gemButtonsHTML = Object.entries(player.tokens || {})
+            .filter(([_, amt]) => amt > 0)
+            .map(([res, amt]) => {
+                const alreadySelected = countsSelected[res] || 0;
+                const remainingToPick = amt - alreadySelected;
+                const isDisabled = remainingToPick <= 0 || remainingNeeded <= 0;
+
+                return `
+                    <div class="discard-gem-btn token ${res} ${isDisabled ? 'disabled' : ''}" 
+                         data-resource="${res}" 
+                         title="Click to select ${res} for discard"
+                         style="cursor: ${isDisabled ? 'not-allowed' : 'pointer'};">
+                        <span class="discard-gem-badge">${remainingToPick}</span>
+                    </div>
+                `;
+            }).join('');
+
+        const selectedTrayHTML = (!this.pendingDiscardTokens || this.pendingDiscardTokens.length === 0)
+            ? `<span style="color: var(--text-muted); font-size: 0.85em; font-style: italic;">Click gems above to select for discard</span>`
+            : this.pendingDiscardTokens.map((res, idx) => `
+                <div class="discard-chip-item token ${res}" 
+                     data-index="${idx}" 
+                     title="Click to remove ${res} from discard">
+                </div>
+            `).join('');
+
+        const isReady = remainingNeeded === 0;
 
         overlay.innerHTML = `
-            <div class="modal-box" style="max-width: 440px;">
-                <h2 style="color: #e74c3c; margin-top: 0;">Token Limit Exceeded</h2>
-                <p style="font-size: 0.9em; margin-bottom: 8px;">You hold <b>${player.getTotalTokenCount ? player.getTotalTokenCount() : 0}</b> tokens (maximum allowed: 10).</p>
-                <div style="background: rgba(0,0,0,0.3); padding: 8px 10px; margin: 10px 0; border-radius: 6px;">${tokenCounts}</div>
+            <div class="modal-box" style="max-width: 460px; text-align: center; border-color: ${isReady ? '#2ecc71' : 'var(--panel-border)'};">
+                <h2 style="color: #e74c3c; margin-top: 0; font-family: 'Cinzel', serif; font-size: 1.4em; letter-spacing: 1px;">⚠️ Token Limit Exceeded</h2>
+                <p style="font-size: 0.9em; margin-bottom: 8px;">
+                    You hold <b>${currentCount}</b> tokens (limit: 10). Please discard <b><span id="discard-remaining-count" style="color: ${isReady ? '#2ecc71' : '#e74c3c'}; font-size: 1.1em;">${remainingNeeded}</span></b> more token(s).
+                </p>
                 
-                <div style="margin-bottom: 15px;">
-                    <button id="cancel-discard-btn" class="res-btn" style="width: 100%; padding: 10px; font-size: 0.9em; background: linear-gradient(to bottom, #27ae60, #1e8449); color: #fff; font-weight: bold; cursor: pointer; border: 1px solid #2ecc71;">⬅️ Go Back & Take Fewer Tokens</button>
+                <div style="background: rgba(0,0,0,0.4); padding: 12px 14px; margin: 10px 0; border-radius: 8px; border: 1px solid var(--panel-border);">
+                    <p style="font-size: 0.8em; color: var(--text-muted); margin: 0 0 10px 0;">Click your colored gems to select for discard:</p>
+                    <div id="discard-gem-palette" style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
+                        ${gemButtonsHTML}
+                    </div>
                 </div>
 
-                <div style="border-top: 1px solid rgba(212,175,55,0.2); padding-top: 10px;">
-                    <p style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 6px;">Or select <b>${excess}</b> token(s) to discard:</p>
-                    ${dropdownsHTML}
-                    <button id="confirm-discard-btn" class="buy-btn" style="margin-top: 10px; font-size: 0.9em; padding: 8px 16px; width: 100%;">Discard Selected Tokens</button>
+                <div style="background: rgba(231, 76, 60, 0.12); border: 1px dashed rgba(231, 76, 60, 0.6); border-radius: 8px; padding: 10px; margin: 10px 0; min-height: 50px;">
+                    <p style="font-size: 0.8em; color: var(--text-muted); margin: 0 0 8px 0;">Selected for Discard (Click gem to remove):</p>
+                    <div id="discard-selected-tray" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; min-height: 38px; align-items: center;">
+                        ${selectedTrayHTML}
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button id="cancel-discard-btn" class="res-btn" style="flex: 1; padding: 10px; font-size: 0.85em; background: linear-gradient(to bottom, #27ae60, #1e8449); color: #fff; font-weight: bold; cursor: pointer; border: 1px solid #2ecc71; border-radius: 6px;">⬅️ Take Fewer Tokens</button>
+                    <button id="confirm-discard-btn" class="buy-btn" style="flex: 1; font-size: 0.85em; padding: 10px; opacity: ${isReady ? '1' : '0.4'}; cursor: ${isReady ? 'pointer' : 'not-allowed'};" ${isReady ? '' : 'disabled'}>
+                        ${isReady ? '✅ Discard Selected' : `Select ${remainingNeeded} more`}
+                    </button>
                 </div>
             </div>
         `;
-        overlay.style.display = 'flex';
+
+        // Attach interactive click listeners
+        const palette = overlay.querySelector('#discard-gem-palette');
+        if (palette) {
+            palette.onclick = (e) => {
+                const btn = e.target.closest('.discard-gem-btn');
+                if (!btn || btn.classList.contains('disabled')) return;
+                const res = btn.dataset.resource;
+                if (!this.pendingDiscardTokens) this.pendingDiscardTokens = [];
+                if (this.pendingDiscardTokens.length < this.excessToDiscard) {
+                    this.pendingDiscardTokens.push(res);
+                    this.updateDiscardModalContent(overlay, player);
+                }
+            };
+        }
+
+        const tray = overlay.querySelector('#discard-selected-tray');
+        if (tray) {
+            tray.onclick = (e) => {
+                const chip = e.target.closest('.discard-chip-item');
+                if (!chip) return;
+                const idx = parseInt(chip.dataset.index, 10);
+                if (!isNaN(idx) && idx >= 0 && idx < this.pendingDiscardTokens.length) {
+                    this.pendingDiscardTokens.splice(idx, 1);
+                    this.updateDiscardModalContent(overlay, player);
+                }
+            };
+        }
+    }
+
+    getPendingDiscardTokens() {
+        return this.pendingDiscardTokens || [];
     }
 
     hideDiscardModal() {
         const overlay = document.getElementById('discard-overlay');
         if (overlay) overlay.style.display = 'none';
+        this.pendingDiscardTokens = [];
     }
 }

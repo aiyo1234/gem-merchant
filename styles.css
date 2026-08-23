@@ -737,3 +737,87 @@ h1, h2, h3, h4, .cinzel-font {
         width: 95%;
     }
 }
+
+/* ==========================================
+   VISUAL GEM DISCARD MODAL
+   ========================================== */
+.discard-gem-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2.5px solid rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    position: relative;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.4);
+    transition: transform 0.15s, box-shadow 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    user-select: none;
+}
+
+.discard-gem-btn:hover:not(.disabled) {
+    transform: scale(1.15) translateY(-2px);
+    box-shadow: 0 0 14px rgba(231, 76, 60, 0.8);
+}
+
+.discard-gem-btn.disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    filter: grayscale(60%);
+}
+
+.discard-gem-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #040d16;
+    color: var(--text-gold);
+    border: 1.5px solid var(--panel-border);
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 0.75em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+.discard-chip-item {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    cursor: pointer;
+    position: relative;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.5), inset 0 2px 3px rgba(255,255,255,0.4);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s;
+    animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.discard-chip-item:hover {
+    transform: scale(1.12);
+    box-shadow: 0 0 10px rgba(231, 76, 60, 0.9);
+}
+
+.discard-chip-item::after {
+    content: '✕';
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #e74c3c;
+    color: white;
+    font-size: 10px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}

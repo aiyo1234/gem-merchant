@@ -621,8 +621,14 @@ document.addEventListener('click', (e) => {
         if (!canLocalPlayerAct()) return;
 
         try {
-            const selects = document.querySelectorAll('.discard-select');
-            const tokensToDiscard = Array.from(selects).map(s => s.value);
+            let tokensToDiscard = ui.getPendingDiscardTokens ? ui.getPendingDiscardTokens() : [];
+            if (!tokensToDiscard || tokensToDiscard.length === 0) {
+                const selects = document.querySelectorAll('.discard-select');
+                if (selects.length > 0) {
+                    tokensToDiscard = Array.from(selects).map(s => s.value);
+                }
+            }
+
             game.discardTokens(tokensToDiscard);
 
             if (currentGameMode === 'online' && currentRoomCode) {
