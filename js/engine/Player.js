@@ -1,8 +1,9 @@
 import { RESOURCES } from './constants.js';
 
 export class Player {
-    constructor(name) {
+    constructor(name, isBot = false) {
         this.name = name;
+        this.isBot = isBot || (typeof name === 'string' && (name.toLowerCase().includes('bot') || name.toLowerCase().includes('ai')));
         this.tokens = {
             [RESOURCES.RUBY]: 0,
             [RESOURCES.SAPPHIRE]: 0,

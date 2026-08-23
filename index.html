@@ -75,9 +75,12 @@
                     <ul id="lobby-player-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px;"></ul>
                 </div>
 
-                <div id="lobby-host-controls" style="display: none; flex-direction: column; gap: 6px;">
+                <div id="lobby-host-controls" style="display: none; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; gap: 8px;">
+                        <button id="lobby-add-bot-btn" class="nav-btn" style="flex: 1; padding: 10px; font-size: 0.9em; background: linear-gradient(to bottom, #8e44ad, #6c3483); border: 1px solid #a569bd; color: #fff;">🤖 + Add Grandmaster Bot</button>
+                    </div>
                     <button id="lobby-start-game-btn" class="buy-btn" style="padding: 12px; font-size: 1.05em; background: linear-gradient(to bottom, #f1c40f, #d4af37); color: #1a0f00; font-weight: 900;">🚀 START GAME</button>
-                    <div style="font-size: 0.75em; color: var(--text-muted);">(Need at least 2 players to start)</div>
+                    <div style="font-size: 0.75em; color: var(--text-muted);">(Need at least 2 players to start, max 4)</div>
                 </div>
 
                 <div id="lobby-guest-msg" style="display: none; font-size: 0.85em; color: #3498db; font-style: italic;">
@@ -180,6 +183,6 @@
     </div>
 
     <!-- Main Entry Script -->
-    <script type="module" src="js/main.js?v=11.0"></script>
+    <script type="module" src="js/main.js?v=11.1"></script>
 </body>
 </html>

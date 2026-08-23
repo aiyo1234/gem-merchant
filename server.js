@@ -92,6 +92,53 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Host adds a Grandmaster AI bot to fill in player slots (up to 4 total)
+    socket.on('add_bot', ({ roomCode }) => {
+        if (!roomCode) return;
+        const normalizedRoom = roomCode.trim().toLowerCase();
+        const room = rooms[normalizedRoom];
+        if (room && room.hostId === socket.id && !room.gameStarted && room.players.length < 4) {
+            const existingBots = room.players.filter(p => p.isBot);
+            const botNames = ['Grandmaster Bot 1', 'Grandmaster Bot 2', 'Grandmaster Bot 3'];
+            const botName = botNames[existingBots.length] || `Grandmaster Bot ${existingBots.length + 1}`;
+
+            room.players.push({
+                id: `bot_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+                name: botName,
+                isHost: false,
+                isBot: true,
+                online: true
+            });
+
+            console.log(`Host added ${botName} to room ${normalizedRoom}. Total players: ${room.players.length}`);
+
+            io.to(normalizedRoom).emit('update_room', {
+                roomCode: room.roomCode,
+                hostId: room.hostId,
+                players: room.players,
+                gameStarted: room.gameStarted
+            });
+        }
+    });
+
+    // Host removes a specific bot
+    socket.on('remove_bot', ({ roomCode, botId }) => {
+        if (!roomCode || !botId) return;
+        const normalizedRoom = roomCode.trim().toLowerCase();
+        const room = rooms[normalizedRoom];
+        if (room && room.hostId === socket.id && !room.gameStarted) {
+            room.players = room.players.filter(p => p.id !== botId);
+            console.log(`Host removed bot ${botId} from room ${normalizedRoom}. Total players: ${room.players.length}`);
+
+            io.to(normalizedRoom).emit('update_room', {
+                roomCode: room.roomCode,
+                hostId: room.hostId,
+                players: room.players,
+                gameStarted: room.gameStarted
+            });
+        }
+    });
+
     // Host starts the game and broadcasts the initial synchronized state
     socket.on('start_game', ({ roomCode, initialState }) => {
         const normalizedRoom = roomCode.trim().toLowerCase();

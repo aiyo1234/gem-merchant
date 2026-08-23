@@ -445,7 +445,7 @@ export class UIRenderer {
                 <div class="player-board-header">
                     <div class="player-name-text">
                         ${statusDot}
-                        <span>${(player.name || 'Player').toUpperCase()} ${isUser ? '(YOU)' : ''}</span>
+                        <span>${player.isBot ? '🤖 ' : ''}${(player.name || 'Player').toUpperCase()} ${isUser ? '(YOU)' : ''}</span>
                         ${isLeader ? '👑' : ''}
                     </div>
                     <div class="player-prestige-badge">${player.prestige || 0} PTS</div>

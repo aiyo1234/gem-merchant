@@ -1,5 +1,6 @@
 import { GameState } from './engine/GameState.js?v=8.2';
 import { UIRenderer } from './ui/UIRenderer.js?v=8.2';
+import { GrandmasterAI } from './engine/GrandmasterAI.js';
 
 const game = new GameState();
 const ui = new UIRenderer(game);
@@ -70,6 +71,10 @@ function playSound(sound, playbackRate = 1.0) {
     }
 }
 
+function amIHost() {
+    return currentRoomPlayers.some(p => p.id === socket.id && p.isHost);
+}
+
 function canLocalPlayerAct() {
     if (game.isGameOver) return false;
     if (currentGameMode === 'solo') {
@@ -81,9 +86,70 @@ function canLocalPlayerAct() {
     if (currentGameMode === 'online') {
         const currentPlayer = game.getCurrentPlayer();
         if (!currentPlayer) return false;
+        if (currentPlayer.isBot) return false;
         return currentPlayer.name.trim().toLowerCase() === myPlayerName.trim().toLowerCase();
     }
     return true;
+}
+
+function checkAndTriggerOnlineBotIfNeeded() {
+    if (currentGameMode !== 'online' || !currentRoomCode || game.isGameOver) return;
+    if (!amIHost()) return;
+
+    const curPlayer = game.getCurrentPlayer();
+    if (!curPlayer || !curPlayer.isBot) return;
+
+    console.log(`[Host] Triggering online bot turn for: ${curPlayer.name}`);
+    setTimeout(() => {
+        if (game.isGameOver) return;
+        const currentActive = game.getCurrentPlayer();
+        if (!currentActive || !currentActive.isBot) return;
+
+        try {
+            const action = GrandmasterAI.computeBestAction(game, currentActive);
+            let actionData = null;
+
+            if (action.type === 'BUY_CARD') {
+                game.purchaseVisibleCard(action.tier, action.cardId);
+                actionData = { type: 'BUY_CARD', tier: action.tier, cardId: action.cardId };
+                playSound(sfxPurchase, 1.5);
+            } else if (action.type === 'BUY_RESERVED') {
+                game.purchaseReservedCard(action.cardId);
+                actionData = { type: 'BUY_RESERVED', cardId: action.cardId };
+                playSound(sfxPurchase, 1.5);
+            } else if (action.type === 'RESERVE_CARD') {
+                game.reserveVisibleCard(action.tier, action.cardId);
+                actionData = { type: 'RESERVE_CARD', tier: action.tier, cardId: action.cardId };
+                playSound(sfxReserve, 1.2);
+            } else if (action.type === 'TAKE_TWO') {
+                game.takeTwoResources(action.resource);
+                actionData = { type: 'TAKE_TWO', resource: action.resource };
+                playSound(sfxToken, 1.6);
+            } else if (action.type === 'TAKE_DIFFERENT') {
+                game.takeDifferentResources(action.tokens);
+                actionData = { type: 'TAKE_DIFFERENT', tokens: action.tokens };
+                playSound(sfxToken, 1.6);
+            } else {
+                game.advanceTurn();
+            }
+
+            if (actionData) {
+                socket.emit('game_action', {
+                    roomCode: currentRoomCode,
+                    actionData,
+                    fullState: game.serializeCurrentState()
+                });
+            }
+
+            ui.renderAll();
+            checkAndTriggerOnlineBotIfNeeded();
+        } catch (err) {
+            console.error("Error executing online bot action:", err);
+            game.advanceTurn();
+            ui.renderAll();
+            checkAndTriggerOnlineBotIfNeeded();
+        }
+    }, 700);
 }
 
 function copyRoomCodeToClipboard() {
@@ -108,7 +174,10 @@ socket.on('update_room', (roomData) => {
     if (game.players && game.players.length > 0) {
         game.players.forEach(gp => {
             const match = currentRoomPlayers.find(rp => rp.name.toLowerCase() === gp.name.toLowerCase());
-            if (match) gp.online = match.online;
+            if (match) {
+                gp.online = match.online;
+                if (match.isBot) gp.isBot = true;
+            }
         });
         ui.renderAll();
     }
@@ -120,21 +189,32 @@ socket.on('update_room', (roomData) => {
     const countDisplay = document.getElementById('lobby-player-count');
     if (countDisplay) countDisplay.innerText = `${currentRoomPlayers.length}/4`;
 
+    const isHostUser = amIHost();
+
     const playerListEl = document.getElementById('lobby-player-list');
     if (playerListEl) {
         playerListEl.innerHTML = currentRoomPlayers.map(p => {
             const isMe = p.name.toLowerCase() === myPlayerName.toLowerCase();
             const isHost = p.isHost;
             const isOnline = p.online !== false;
+            const isBot = p.isBot === true;
+
+            const removeBtn = (isHostUser && isBot)
+                ? `<button class="remove-bot-btn" data-bot-id="${p.id}" style="background: none; border: none; color: #e74c3c; cursor: pointer; font-size: 1.1em; padding: 2px 6px; font-weight: bold;" title="Remove Bot">✕</button>`
+                : '';
+
             return `
-                <li style="padding: 8px 12px; background: rgba(0,0,0,0.3); border-radius: 6px; border: 1px solid ${isMe ? '#2ecc71' : '#5a4b31'}; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: bold; color: ${isMe ? '#2ecc71' : 'var(--text-gold)'}; display: flex; align-items: center; gap: 6px;">
-                        <span class="${isOnline ? 'online-dot' : 'offline-dot'}" title="${isOnline ? 'Online' : 'Offline'}"></span>
+                <li style="padding: 8px 12px; background: rgba(0,0,0,0.3); border-radius: 6px; border: 1px solid ${isMe ? '#2ecc71' : (isBot ? '#8e44ad' : '#5a4b31')}; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold; color: ${isMe ? '#2ecc71' : (isBot ? '#d2b4de' : 'var(--text-gold)')}; display: flex; align-items: center; gap: 6px;">
+                        <span class="${isBot ? '' : (isOnline ? 'online-dot' : 'offline-dot')}" title="${isBot ? 'Grandmaster AI' : (isOnline ? 'Online' : 'Offline')}">${isBot ? '🤖' : ''}</span>
                         ${p.name} ${isMe ? '(You)' : ''}
                     </span>
-                    <span style="font-size: 0.75em; color: ${isHost ? 'var(--gold)' : 'var(--text-muted)'}; text-transform: uppercase; font-weight: bold;">
-                        ${isHost ? '👑 Host' : (isOnline ? 'Merchant' : 'Offline')}
-                    </span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 0.75em; color: ${isHost ? 'var(--gold)' : (isBot ? '#bb8fce' : 'var(--text-muted)')}; text-transform: uppercase; font-weight: bold;">
+                            ${isHost ? '👑 Host' : (isBot ? 'Grandmaster Bot' : (isOnline ? 'Merchant' : 'Offline'))}
+                        </span>
+                        ${removeBtn}
+                    </div>
                 </li>
             `;
         }).join('');
@@ -143,15 +223,21 @@ socket.on('update_room', (roomData) => {
     const hostControls = document.getElementById('lobby-host-controls');
     const guestMsg = document.getElementById('lobby-guest-msg');
     const startBtn = document.getElementById('lobby-start-game-btn');
+    const addBotBtn = document.getElementById('lobby-add-bot-btn');
 
-    const amIHost = currentRoomPlayers.some(p => p.id === socket.id && p.isHost);
-    if (amIHost) {
+    if (isHostUser) {
         if (hostControls) hostControls.style.display = 'flex';
         if (guestMsg) guestMsg.style.display = 'none';
         if (startBtn) {
             startBtn.disabled = currentRoomPlayers.length < 2;
             startBtn.style.opacity = currentRoomPlayers.length < 2 ? '0.5' : '1.0';
             startBtn.style.cursor = currentRoomPlayers.length < 2 ? 'not-allowed' : 'pointer';
+        }
+        if (addBotBtn) {
+            addBotBtn.disabled = currentRoomPlayers.length >= 4;
+            addBotBtn.style.opacity = currentRoomPlayers.length >= 4 ? '0.5' : '1.0';
+            addBotBtn.style.cursor = currentRoomPlayers.length >= 4 ? 'not-allowed' : 'pointer';
+            addBotBtn.innerText = currentRoomPlayers.length >= 4 ? '🤖 Room Full (Max 4)' : '🤖 + Add Grandmaster Bot';
         }
     } else {
         if (hostControls) hostControls.style.display = 'none';
@@ -183,8 +269,18 @@ socket.on('game_started', (initialState) => {
     ui.currentRoomCode = currentRoomCode;
 
     game.loadInitialState(initialState);
+
+    // Apply isBot flags from room list
+    currentRoomPlayers.forEach(rp => {
+        if (rp.isBot) {
+            const gp = game.players.find(p => p.name.toLowerCase() === rp.name.toLowerCase());
+            if (gp) gp.isBot = true;
+        }
+    });
+
     ui.renderAll();
     ui.showToast(`🚀 The game has begun! Good luck merchants!`);
+    checkAndTriggerOnlineBotIfNeeded();
 });
 
 // Reconnection Live State Sync (Resumes game right where it left off)
@@ -200,8 +296,17 @@ socket.on('sync_live_state', ({ liveState, reconnect }) => {
     ui.currentRoomCode = currentRoomCode;
 
     game.loadCurrentState(liveState);
+
+    currentRoomPlayers.forEach(rp => {
+        if (rp.isBot) {
+            const gp = game.players.find(p => p.name.toLowerCase() === rp.name.toLowerCase());
+            if (gp) gp.isBot = true;
+        }
+    });
+
     ui.renderAll();
     ui.showToast(`✅ Successfully reconnected to match in Room <b>${currentRoomCode.toUpperCase()}</b>!`);
+    checkAndTriggerOnlineBotIfNeeded();
 });
 
 // Sync Turn Actions across connected clients
@@ -229,6 +334,14 @@ socket.on('sync_game_state', ({ actionData, fullState }) => {
             }
         }
 
+        // Apply isBot flags
+        currentRoomPlayers.forEach(rp => {
+            if (rp.isBot) {
+                const gp = game.players.find(p => p.name.toLowerCase() === rp.name.toLowerCase());
+                if (gp) gp.isBot = true;
+            }
+        });
+
         // Action audio & toasts
         if (actionData) {
             if (actionData.type === 'TAKE_DIFFERENT' || actionData.type === 'TAKE_TWO') {
@@ -246,6 +359,7 @@ socket.on('sync_game_state', ({ actionData, fullState }) => {
         if (fullState) game.loadCurrentState(fullState);
     }
     ui.renderAll();
+    checkAndTriggerOnlineBotIfNeeded();
 });
 
 // Initialize default mobile tab
@@ -425,6 +539,27 @@ document.addEventListener('click', (e) => {
         return;
     }
 
+    // Host Adds Grandmaster AI Bot to Room
+    if (e.target.id === 'lobby-add-bot-btn') {
+        if (!amIHost()) return;
+        if (currentRoomPlayers.length >= 4) {
+            alert("Maximum 4 players allowed in a room.");
+            return;
+        }
+        socket.emit('add_bot', { roomCode: currentRoomCode });
+        return;
+    }
+
+    // Host Removes Bot from Room
+    if (e.target.classList.contains('remove-bot-btn') || e.target.closest('.remove-bot-btn')) {
+        const btn = e.target.classList.contains('remove-bot-btn') ? e.target : e.target.closest('.remove-bot-btn');
+        const botId = btn.dataset.botId;
+        if (botId && amIHost()) {
+            socket.emit('remove_bot', { roomCode: currentRoomCode, botId });
+        }
+        return;
+    }
+
     // Host Starts Online Game
     if (e.target.id === 'lobby-start-game-btn') {
         if (currentRoomPlayers.length < 2) {
@@ -434,8 +569,14 @@ document.addEventListener('click', (e) => {
 
         const playerNames = currentRoomPlayers.map(p => p.name);
         game.initializeGame(playerNames, false);
-        const initialState = game.serializeInitialState();
 
+        currentRoomPlayers.forEach((rp, idx) => {
+            if (rp.isBot && game.players[idx]) {
+                game.players[idx].isBot = true;
+            }
+        });
+
+        const initialState = game.serializeInitialState();
         socket.emit('start_game', { roomCode: currentRoomCode, initialState });
         return;
     }
@@ -504,6 +645,7 @@ document.addEventListener('click', (e) => {
 
             selectedTokens = [];
             ui.renderAll();
+            checkAndTriggerOnlineBotIfNeeded();
         } catch (err) {
             alert(err.message);
         }
@@ -536,6 +678,7 @@ document.addEventListener('click', (e) => {
             }
 
             ui.renderAll();
+            checkAndTriggerOnlineBotIfNeeded();
         } catch (err) {
             alert(err.message);
         }
@@ -563,6 +706,7 @@ document.addEventListener('click', (e) => {
             }
 
             ui.renderAll();
+            checkAndTriggerOnlineBotIfNeeded();
         } catch (err) {
             alert(err.message);
         }
@@ -589,6 +733,7 @@ document.addEventListener('click', (e) => {
             }
 
             ui.renderAll();
+            checkAndTriggerOnlineBotIfNeeded();
         } catch (err) {
             alert(err.message);
         }
@@ -641,6 +786,7 @@ document.addEventListener('click', (e) => {
 
             ui.hideDiscardModal();
             ui.renderAll();
+            checkAndTriggerOnlineBotIfNeeded();
         } catch (err) {
             alert(err.message);
         }
