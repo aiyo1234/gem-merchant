@@ -5,15 +5,15 @@ import { MCTSEngine } from './MCTSEngine.js';
 import { MCTS_DNN_WEIGHTS } from './mcts_weights_data.js';
 
 export class GrandmasterAI {
-    // Evolved Baseline Genome Weights from 3,000+ Self-Play Matches
+    // Evolved Champion Genome Weights from 1,000,000+ Self-Play Matches
     static DEFAULT_WEIGHTS = {
-        pointMultiplier: 28.85,
-        freeCardBonus: 29.38,
-        oneTokenBonus: 8.32,
+        pointMultiplier: 25.82,
+        freeCardBonus: 29.44,
+        oneTokenBonus: 7.63,
         twoTokenBonus: 18.16,
         threeTokenBonus: 6.02,
         tier3Bonus: 33.86,
-        marketDemandMultiplier: 2.01,
+        marketDemandMultiplier: 0.68,
         patronSynergyMultiplier: 7.58,
         denialUrgency: 50.45,
         goldReservationThreshold: 2.5

@@ -1,11 +1,11 @@
 {
-  "pointMultiplier": 28.85,
-  "freeCardBonus": 29.38,
-  "oneTokenBonus": 8.32,
+  "pointMultiplier": 25.822967356285417,
+  "freeCardBonus": 29.444733149135605,
+  "oneTokenBonus": 7.633220714139757,
   "twoTokenBonus": 18.16,
   "threeTokenBonus": 6.02,
   "tier3Bonus": 33.86,
-  "marketDemandMultiplier": 2.01,
+  "marketDemandMultiplier": 0.6841796061416126,
   "patronSynergyMultiplier": 7.58,
   "denialUrgency": 50.45,
   "goldReservationThreshold": 2.5
