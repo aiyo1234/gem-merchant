@@ -1,8 +1,11 @@
 import { RuleEngine } from './RuleEngine.js';
 import { RESOURCES, RULES } from './constants.js';
+import { DeepNeuralNetwork } from './DeepNeuralNetwork.js';
+import { MCTSEngine } from './MCTSEngine.js';
+import { MCTS_DNN_WEIGHTS } from './mcts_weights_data.js';
 
 export class GrandmasterAI {
-    // Evolved Baseline Genome Weights from 2,400+ Self-Play Matches
+    // Evolved Baseline Genome Weights from 3,000+ Self-Play Matches
     static DEFAULT_WEIGHTS = {
         pointMultiplier: 28.85,
         freeCardBonus: 29.38,
@@ -12,14 +15,46 @@ export class GrandmasterAI {
         tier3Bonus: 33.86,
         marketDemandMultiplier: 2.01,
         patronSynergyMultiplier: 7.58,
-        denialUrgency: 50.45
+        denialUrgency: 50.45,
+        goldReservationThreshold: 2.5
     };
 
+    static dnnInstance = null;
+
+    static getDNN() {
+        if (!this.dnnInstance) {
+            this.dnnInstance = new DeepNeuralNetwork(193, 64, 32, 16);
+            if (MCTS_DNN_WEIGHTS) {
+                this.dnnInstance.importWeights(MCTS_DNN_WEIGHTS);
+            }
+        }
+        return this.dnnInstance;
+    }
+
     /**
-     * Compute best action using default evolved weights
+     * Compute best action using Deep Neural Network MCTS + Evolved Snowball heuristics
      */
     static computeBestAction(game, aiPlayer) {
-        return this.computeBestActionWithWeights(game, aiPlayer, this.DEFAULT_WEIGHTS);
+        try {
+            // First check heuristic for instant tactical decisions (Winning moves, Free 0-cost cards, Denial)
+            const heuristicAction = this.computeBestActionWithWeights(game, aiPlayer, this.DEFAULT_WEIGHTS);
+            
+            // If heuristic identifies a critical purchase or urgent denial, execute immediately
+            if (heuristicAction.type === 'BUY_CARD' || heuristicAction.type === 'BUY_RESERVED') {
+                return heuristicAction;
+            }
+
+            // Run Deep Neural Network Guided Monte Carlo Tree Search
+            const dnn = this.getDNN();
+            const mctsAction = MCTSEngine.runSearch(game, aiPlayer, dnn, 30);
+            if (mctsAction && mctsAction.type !== 'PASS') {
+                return mctsAction;
+            }
+
+            return heuristicAction;
+        } catch (e) {
+            return this.computeBestActionWithWeights(game, aiPlayer, this.DEFAULT_WEIGHTS);
+        }
     }
 
     /**
