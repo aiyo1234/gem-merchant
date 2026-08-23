@@ -4,6 +4,7 @@ import { RESOURCES, RULES } from './constants.js';
 export class GrandmasterAI {
     /**
      * Compute the highest-tier master-level strategic action for the AI bot
+     * Focuses on: Lowest token cost per card, rapid discount snowballing, and round tempo dominance.
      * @param {GameState} game 
      * @param {Player} aiPlayer 
      * @returns {Object} Action descriptor
@@ -15,6 +16,7 @@ export class GrandmasterAI {
         const opponents = game.players.filter(p => p !== aiPlayer);
         const canReserve = (aiPlayer.reservedCards || []).length < 3;
         const bankHasGold = (game.bank.tokens[RESOURCES.GOLD] || 0) > 0;
+        const totalDiscounts = Object.values(aiPlayer.bonuses || {}).reduce((a, b) => a + b, 0);
 
         // ==============================================================
         // 1. OPPONENT THREAT MODELING & ACTIVE DENIAL (Hate-Drafting)
@@ -30,7 +32,6 @@ export class GrandmasterAI {
                     try {
                         RuleEngine.calculateActualCost(opp, card.cost);
                         
-                        // Check if this card gives opponent victory or patron
                         const simBonuses = { ...opp.bonuses, [card.bonus]: (opp.bonuses[card.bonus] || 0) + 1 };
                         let extraPatronPts = 0;
                         patrons.forEach(p => {
@@ -42,7 +43,7 @@ export class GrandmasterAI {
                         if (projectedPrestige >= RULES.VICTORY_THRESHOLD) {
                             criticalDenialCard = { card, tier, priority: 100 };
                             break;
-                        } else if (card.points >= 3 && oppPrestige >= 9) {
+                        } else if (card.points >= 3 && oppPrestige >= 10) {
                             criticalDenialCard = { card, tier, priority: 50 };
                         }
                     } catch (e) {
@@ -64,7 +65,7 @@ export class GrandmasterAI {
         }
 
         // ==============================================================
-        // 2. CHECK ALL CURRENTLY AFFORDABLE PURCHASES
+        // 2. GATHER ALL CARDS (MARKET + RESERVED)
         // ==============================================================
         const allVisibleAndReserved = [];
         for (let tier = 1; tier <= 3; tier++) {
@@ -76,45 +77,8 @@ export class GrandmasterAI {
             allVisibleAndReserved.push({ card, tier: card.tier, isReserved: true });
         });
 
-        const affordablePurchases = [];
-        for (const item of allVisibleAndReserved) {
-            try {
-                RuleEngine.calculateActualCost(aiPlayer, item.card.cost);
-                
-                // Calculate patron trigger
-                const simBonuses = { ...aiPlayer.bonuses, [item.card.bonus]: (aiPlayer.bonuses[item.card.bonus] || 0) + 1 };
-                let patronReward = 0;
-                patrons.forEach(p => {
-                    if (Object.entries(p.requirements).every(([res, req]) => (simBonuses[res] || 0) >= req)) {
-                        patronReward += p.points;
-                    }
-                });
-
-                const totalPoints = item.card.points + patronReward;
-                const winsGame = (aiPlayer.prestige + totalPoints) >= RULES.VICTORY_THRESHOLD;
-
-                affordablePurchases.push({
-                    ...item,
-                    totalPoints,
-                    patronReward,
-                    winsGame,
-                    efficiency: (totalPoints * 10) + (item.card.tier === 1 ? 1 : (item.card.tier * 3))
-                });
-            } catch (e) {
-                // Cannot afford
-            }
-        }
-
-        // RULE: If we can WIN THE GAME RIGHT NOW, BUY IT!
-        const winningBuy = affordablePurchases.find(p => p.winsGame);
-        if (winningBuy) {
-            return winningBuy.isReserved
-                ? { type: 'BUY_RESERVED', cardId: winningBuy.card.id }
-                : { type: 'BUY_CARD', tier: winningBuy.tier, cardId: winningBuy.card.id };
-        }
-
         // ==============================================================
-        // 3. NOBLE PATRON PATHFINDING & COMBINATORIAL VALUATION
+        // 3. NOBLE PATRON PATHFINDING & DEMAND ANALYSIS
         // ==============================================================
         const patronDesirability = { ruby: 0, sapphire: 0, emerald: 0, onyx: 0, pearl: 0 };
         patrons.forEach(patron => {
@@ -124,84 +88,140 @@ export class GrandmasterAI {
                 if (have < req) {
                     const diff = req - have;
                     missingForPatron += diff;
-                    patronDesirability[res] = (patronDesirability[res] || 0) + (patron.points / (diff + 1)) * 5.0;
+                    patronDesirability[res] = (patronDesirability[res] || 0) + (patron.points / (diff + 1)) * 6.0;
                 }
             }
         });
 
-        // Evaluate all cards in the market with Master heuristic
-        const evaluateCard = (card, tier) => {
+        // Measure how much each bonus color is demanded by high-tier cards (Tier 2 & 3)
+        const marketBonusDemand = { ruby: 0, sapphire: 0, emerald: 0, onyx: 0, pearl: 0 };
+        for (let t = 2; t <= 3; t++) {
+            (game.visibleMarket[t] || []).forEach(c => {
+                for (const [res, amt] of Object.entries(c.cost || {})) {
+                    marketBonusDemand[res] = (marketBonusDemand[res] || 0) + amt;
+                }
+            });
+        }
+
+        // ==============================================================
+        // 4. CARD EVALUATION FUNCTION (LOW TOKEN COST = HIGH TEMPO)
+        // ==============================================================
+        const evaluateCardForPurchase = (item) => {
+            const { card, tier } = item;
+            
+            // Calculate NET tokens that must actually be spent from hand (after discounts)
+            let netTokenCost = 0;
+            for (const [res, amt] of Object.entries(card.cost || {})) {
+                const discount = aiPlayer.bonuses[res] || 0;
+                netTokenCost += Math.max(0, amt - discount);
+            }
+
+            // Check patron trigger
+            const simBonuses = { ...aiPlayer.bonuses, [card.bonus]: (aiPlayer.bonuses[card.bonus] || 0) + 1 };
+            let patronReward = 0;
+            patrons.forEach(p => {
+                if (Object.entries(p.requirements).every(([res, req]) => (simBonuses[res] || 0) >= req)) {
+                    patronReward += p.points;
+                }
+            });
+
+            const totalPointsGained = card.points + patronReward;
+            const winsGame = (aiPlayer.prestige + totalPointsGained) >= RULES.VICTORY_THRESHOLD;
+
             let score = 0;
 
-            // Direct Prestige Points
-            score += card.points * 16.0;
+            // Direct Points Score
+            score += totalPointsGained * 25.0;
 
-            // High Tier 3 points
-            if (card.points >= 4) score += 24.0;
-            else if (card.points >= 3) score += 15.0;
-            else if (card.points >= 2) score += 8.0;
-
-            // Patron Synergy
-            if (patronDesirability[card.bonus]) {
-                score += patronDesirability[card.bonus] * 3.5;
+            // Free card bonus: Buying for 0 net tokens is an immediate free round!
+            if (netTokenCost === 0) {
+                score += 50.0;
+            } else if (netTokenCost === 1) {
+                score += 30.0;
+            } else if (netTokenCost === 2) {
+                score += 18.0;
+            } else if (netTokenCost === 3) {
+                score += 8.0;
             }
 
-            // Market Demand / Future discount utility
-            let futureUtility = 0;
-            for (let t = 2; t <= 3; t++) {
-                (game.visibleMarket[t] || []).forEach(other => {
-                    if (other.cost && other.cost[card.bonus]) {
-                        futureUtility += other.cost[card.bonus] * 1.8;
-                    }
-                });
-            }
-            score += Math.min(futureUtility, 12.0);
+            // High Tier points
+            if (card.points >= 4) score += 35.0;
+            else if (card.points >= 3) score += 20.0;
+            else if (card.points >= 2) score += 10.0;
 
-            // Tier 1 card filter: ONLY reward Tier 1 cards that are ultra-cheap (cost <= 4) or match patron
-            if (tier === 1) {
-                const totalCost = Object.values(card.cost || {}).reduce((a, b) => a + b, 0);
-                if (card.points === 0) {
-                    if (totalCost > 4 && !patronDesirability[card.bonus]) {
-                        score -= 10.0; // Penalize expensive 0-point trap cards!
-                    } else if (totalCost <= 4) {
-                        score += 6.0;
-                    }
-                }
-            }
+            // Permanent Discount Acceleration (Market Demand + Patron Alignment)
+            score += (marketBonusDemand[card.bonus] || 0) * 2.0;
+            score += (patronDesirability[card.bonus] || 0) * 3.5;
 
-            // Late game urgency
-            if (aiPlayer.prestige >= 9 || game.isFinalRound) {
-                score += card.points * 28.0;
-            }
+            // Efficiency ratio: Value divided by net tokens spent
+            const efficiency = (score + 10.0) / (netTokenCost + 1);
 
-            return score;
+            return {
+                netTokenCost,
+                totalPointsGained,
+                patronReward,
+                winsGame,
+                score,
+                efficiency
+            };
         };
 
         // ==============================================================
-        // 4. BUY HIGH-SCORING AFFORDABLE CARD (IF HIGH UTILITY)
+        // 5. EVALUATE AFFORDABLE PURCHASES (CHECK FREE & FAST BUYS)
         // ==============================================================
-        if (affordablePurchases.length > 0) {
-            affordablePurchases.forEach(item => {
-                item.score = evaluateCard(item.card, item.tier) + (item.patronReward * 35.0);
-            });
-            affordablePurchases.sort((a, b) => b.score - a.score);
+        const affordablePurchases = [];
+        for (const item of allVisibleAndReserved) {
+            try {
+                RuleEngine.calculateActualCost(aiPlayer, item.card.cost);
+                const evalData = evaluateCardForPurchase(item);
+                affordablePurchases.push({
+                    ...item,
+                    ...evalData
+                });
+            } catch (e) {
+                // Not affordable
+            }
+        }
 
-            const topAffordable = affordablePurchases[0];
-            // Buy if it gives points, claims a patron, or has high strategic score
-            if (topAffordable.totalPoints > 0 || topAffordable.score >= 12.0 || aiPlayer.prestige >= 8) {
-                return topAffordable.isReserved
-                    ? { type: 'BUY_RESERVED', cardId: topAffordable.card.id }
-                    : { type: 'BUY_CARD', tier: topAffordable.tier, cardId: topAffordable.card.id };
+        // TACTIC 1: IMMEDIATE WINNING PURCHASE
+        const winningBuy = affordablePurchases.find(p => p.winsGame);
+        if (winningBuy) {
+            return winningBuy.isReserved
+                ? { type: 'BUY_RESERVED', cardId: winningBuy.card.id }
+                : { type: 'BUY_CARD', tier: winningBuy.tier, cardId: winningBuy.card.id };
+        }
+
+        // TACTIC 2: ZERO-COST "FREE" PURCHASES (100% DISCOUNT)
+        // If any card costs 0 net tokens, ALWAYS buy it! It builds permanent discounts without spending a single token!
+        const freePurchases = affordablePurchases.filter(p => p.netTokenCost === 0);
+        if (freePurchases.length > 0) {
+            freePurchases.sort((a, b) => b.efficiency - a.efficiency);
+            const bestFree = freePurchases[0];
+            return bestFree.isReserved
+                ? { type: 'BUY_RESERVED', cardId: bestFree.card.id }
+                : { type: 'BUY_CARD', tier: bestFree.tier, cardId: bestFree.card.id };
+        }
+
+        // TACTIC 3: HIGH-TEMPO AFFORDABLE CARD (LOW TOKENS SPENT OR HIGH POINTS)
+        if (affordablePurchases.length > 0) {
+            affordablePurchases.sort((a, b) => b.efficiency - a.efficiency);
+            const topBuy = affordablePurchases[0];
+
+            // In early game, buy if net token cost is low (<= 3 tokens) to build discounts rapidly.
+            // In late game (or when card gives points), buy if it gives points!
+            if (topBuy.netTokenCost <= 3 || topBuy.totalPointsGained > 0 || aiPlayer.prestige >= 8) {
+                return topBuy.isReserved
+                    ? { type: 'BUY_RESERVED', cardId: topBuy.card.id }
+                    : { type: 'BUY_CARD', tier: topBuy.tier, cardId: topBuy.card.id };
             }
         }
 
         // ==============================================================
-        // 5. SELECT TOP GOAL CARDS & CALCULATE EXACT TOKEN DEFICIT
+        // 6. TARGET CARDS & FASTEST PATH TO 15 POINTS
         // ==============================================================
         const futureCandidates = allVisibleAndReserved.map(item => {
-            const score = evaluateCard(item.card, item.tier);
-            
-            // Calculate missing tokens
+            const evalData = evaluateCardForPurchase(item);
+
             let missingTokens = 0;
             const deficits = {};
             for (const [res, amt] of Object.entries(item.card.cost || {})) {
@@ -218,24 +238,25 @@ export class GrandmasterAI {
             missingTokens = Math.max(0, missingTokens - gold);
 
             const turnsNeeded = Math.ceil(missingTokens / 2.5);
-            const efficiency = score / (turnsNeeded + 1);
+            const overallSpeedScore = evalData.efficiency / (turnsNeeded + 1);
 
             return {
                 ...item,
-                score,
-                efficiency,
+                ...evalData,
                 missingTokens,
-                deficits
+                turnsNeeded,
+                deficits,
+                overallSpeedScore
             };
-        }).sort((a, b) => b.efficiency - a.efficiency);
+        }).sort((a, b) => b.overallSpeedScore - a.overallSpeedScore);
 
         const primaryTarget = futureCandidates[0];
 
         // ==============================================================
-        // 6. PROACTIVE STRATEGIC RESERVATION (Accelerate with Gold!)
+        // 7. STRATEGIC RESERVATION (LOCK HIGH-TIER COMBO + GOLD)
         // ==============================================================
         if (canReserve && bankHasGold && primaryTarget && !primaryTarget.isReserved) {
-            // If primary target is a massive 3-5 point card, reserve it to lock it in and get Gold!
+            // Reserve high-value Tier 3 (3-5 pts) cards or critical combo pieces
             if (primaryTarget.card.points >= 3 || (criticalDenialCard && criticalDenialCard.card.id === primaryTarget.card.id)) {
                 return {
                     type: 'RESERVE_CARD',
@@ -243,25 +264,17 @@ export class GrandmasterAI {
                     cardId: primaryTarget.card.id
                 };
             }
-            // In early/mid game, if AI has < 2 reserved cards and finds a Tier 2 (2+ pts) card
-            if (primaryTarget.card.points >= 2 && (aiPlayer.reservedCards || []).length < 2 && aiPlayer.getTotalTokenCount() <= 6) {
-                return {
-                    type: 'RESERVE_CARD',
-                    tier: primaryTarget.tier,
-                    cardId: primaryTarget.card.id
-                };
-            }
         }
 
         // ==============================================================
-        // 7. OPTIMAL TOKEN MATH (No Wasted Capacity)
+        // 8. OPTIMAL TOKEN COMBINATORICS (TARGET SPECIFIC DEFICITS)
         // ==============================================================
         const bank = game.bank.tokens;
         const availableColors = Object.entries(bank)
             .filter(([res, count]) => res !== 'gold' && count > 0)
             .map(([res]) => res);
 
-        // Candidate A: Take 2 of the same token (if 4+ in bank and needed for top targets)
+        // Option A: Take 2 tokens of same color if 4+ in bank and needed for primary target
         const fourPlusColors = availableColors.filter(res => (bank[res] || 0) >= 4);
         for (const res of fourPlusColors) {
             if (primaryTarget && primaryTarget.deficits[res] >= 2) {
@@ -269,21 +282,23 @@ export class GrandmasterAI {
             }
         }
 
-        // Candidate B: Take 3 different needed colors matching top target cards
+        // Option B: Take 3 distinct needed tokens prioritizing the fastest-to-build discount cards
         const combinedNeeds = {};
-        futureCandidates.slice(0, 3).forEach((target, rank) => {
-            const weight = (3 - rank);
+        futureCandidates.slice(0, 4).forEach((target, rank) => {
+            const weight = (4 - rank);
             for (const [res, count] of Object.entries(target.deficits)) {
                 combinedNeeds[res] = (combinedNeeds[res] || 0) + (count * weight * 2.0);
             }
         });
 
-        // Add patron bonus weights
+        // Add patron and market discount weights
         for (const [res, weight] of Object.entries(patronDesirability)) {
             combinedNeeds[res] = (combinedNeeds[res] || 0) + weight;
         }
+        for (const [res, count] of Object.entries(marketBonusDemand)) {
+            combinedNeeds[res] = (combinedNeeds[res] || 0) + (count * 1.5);
+        }
 
-        // Rank available tokens by priority
         const rankedColors = availableColors.sort((a, b) => {
             const needA = combinedNeeds[a] || 0;
             const needB = combinedNeeds[b] || 0;
@@ -306,7 +321,7 @@ export class GrandmasterAI {
             return { type: 'TAKE_DIFFERENT', tokens: chosen };
         }
 
-        // Fallback: Purchase any affordable card
+        // Fallback: Purchase any affordable card or pass
         if (affordablePurchases.length > 0) {
             const fallback = affordablePurchases[0];
             return fallback.isReserved
