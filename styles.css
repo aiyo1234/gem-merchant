@@ -609,14 +609,131 @@ h1, h2, h3, h4, .cinzel-font {
     text-align: center;
 }
 
-/* Responsive adjustments */
-@media (max-width: 900px) {
-    #main-layout {
-        grid-template-columns: 180px 1fr 240px;
-        gap: 8px;
+.mobile-nav-tabs-bar {
+    display: none;
+}
+
+/* ==========================================
+   RESPONSIVE DESIGN (COMPUTER & MOBILE)
+   ========================================== */
+@media (max-width: 950px) {
+    #game-container {
+        padding: 4px 6px;
     }
+
+    #top-nav-bar {
+        padding: 6px 10px;
+        margin-bottom: 6px;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .game-title-badge {
+        font-size: 0.9em;
+        letter-spacing: 0.5px;
+    }
+
+    .turn-banner {
+        font-size: 0.8em;
+        padding: 4px 10px;
+    }
+
+    .nav-btn {
+        padding: 4px 8px;
+        font-size: 0.72em;
+    }
+
+    .mobile-nav-tabs-bar {
+        display: flex;
+        gap: 6px;
+        width: 100%;
+        margin-bottom: 6px;
+        background: rgba(11, 28, 44, 0.9);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        padding: 3px;
+        box-sizing: border-box;
+    }
+
+    .mobile-tab-btn {
+        flex: 1;
+        padding: 8px 4px;
+        font-family: 'Montserrat', sans-serif;
+        font-size: 0.8em;
+        font-weight: 700;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text-gold);
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+    }
+
+    .mobile-tab-btn.active-tab {
+        background: linear-gradient(to bottom, #f1c40f, #d4af37);
+        color: #1a0f00;
+        box-shadow: 0 2px 8px rgba(241, 196, 15, 0.4);
+    }
+
+    #main-layout {
+        display: block;
+        position: relative;
+        height: calc(100vh - 125px);
+        overflow: hidden;
+    }
+
+    /* Mobile tab views */
+    body.tab-market #board-center { display: flex; height: 100%; }
+    body.tab-market #bank-sidebar { display: none; }
+    body.tab-market #players-sidebar { display: none; }
+
+    body.tab-bank #board-center { display: none; }
+    body.tab-bank #bank-sidebar { display: block; height: 100%; max-width: 380px; margin: 0 auto; }
+    body.tab-bank #players-sidebar { display: none; }
+
+    body.tab-players #board-center { display: none; }
+    body.tab-players #bank-sidebar { display: none; }
+    body.tab-players #players-sidebar { display: block; height: 100%; max-width: 480px; margin: 0 auto; }
+}
+
+@media (max-width: 600px) {
+    #main-layout {
+        height: calc(100vh - 135px);
+    }
+
     .card {
-        width: 105px;
-        height: 150px;
+        width: 100px;
+        height: 145px;
+    }
+
+    .card-points {
+        font-size: 1.1em;
+    }
+
+    .card-bonus-badge {
+        width: 20px;
+        height: 20px;
+    }
+
+    .cost-badge {
+        width: 17px;
+        height: 17px;
+        font-size: 0.65em;
+    }
+
+    .buy-btn, .res-btn {
+        padding: 4px 2px;
+        font-size: 0.6em;
+    }
+
+    .patron-card {
+        width: 85px !important;
+        height: 105px !important;
+    }
+
+    .modal-box {
+        padding: 18px;
+        width: 95%;
     }
 }

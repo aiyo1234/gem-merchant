@@ -245,10 +245,25 @@ socket.on('sync_game_state', ({ actionData, fullState }) => {
     ui.renderAll();
 });
 
+// Initialize default mobile tab
+document.body.classList.add('tab-market');
+
 // ==========================================
 // EVENT LISTENERS & UI INTERACTION
 // ==========================================
 document.addEventListener('click', (e) => {
+    // Mobile Tab Switcher Handler
+    if (e.target.classList.contains('mobile-tab-btn')) {
+        const tab = e.target.dataset.tab;
+        if (tab) {
+            document.querySelectorAll('.mobile-tab-btn').forEach(btn => btn.classList.remove('active-tab'));
+            e.target.classList.add('active-tab');
+            document.body.classList.remove('tab-market', 'tab-bank', 'tab-players');
+            document.body.classList.add(`tab-${tab}`);
+        }
+        return;
+    }
+
     // Music Toggle Button Handler
     if (e.target.id === 'music-toggle-btn') {
         const btn = e.target;
